@@ -12,24 +12,38 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 
-[image1]: ./assets/traffic_sign.png "Visualization Traffic Signs"
+[training_input]: ./assets/traffic_sign.png "Visualization Traffic Signs"
 [hist_train]: ./assets/hist_train.png "Training Histogram"
 [hist_valid]: ./assets/hist_valid.png "Validation Histogram"
 [hist_test]:  ./assets/hist_test.png "Test Histogram"
+[jittered_examples]: ./assets/jittered_examples.png "Augmented data"
 [rgb_vs_y]:   ./assets/rgb_vs_y.png "RBG vs Y"
-[gen_data]: ./assets/augmented_data.png "Augmented data"
-[model01]: ./assets/model01.png "Model architcture 01"
-[model0_overfit]: ./assets/model0_overfit.png "Overfitting Model 0"
-[model0_do]: ./assets/model0_do.png "Model 0 with dropout"
-[model1_bn]: ./assets/model1_bn.png "Model 1 with BN"
-[model2_bn]: ./assets/model2_bn.png "Model 2 with BN"
+[model01_lenet5]: ./assets/model01_lenet5.png         "Model architcture 01"
+[model02_multiscale]: ./assets/model02_multiscale.png "Model architcture 02"
 
-[image3]: ./examples/random_noise.jpg "Random Noise"
-[image4]: ./examples/placeholder.png "Traffic Sign 1"
-[image5]: ./examples/placeholder.png "Traffic Sign 2"
-[image6]: ./examples/placeholder.png "Traffic Sign 3"
-[image7]: ./examples/placeholder.png "Traffic Sign 4"
-[image8]: ./examples/placeholder.png "Traffic Sign 5"
+[exp01_rgb]: ./assets/exp01_rgb.png "Experiment 01 RGB"
+[exp01_y]: ./assets/exp01_y.png "Experiment 01 Y"
+
+[exp02_rgb_scaled]: ./assets/exp02_rgb_scaled.png "Experiment 02 RGB scaled"
+[exp02_rgb_norm]:   ./assets/exp02_rgb_norm.png "Experiment 02 RGB normalized"
+
+[exp03_dropout]: ./assets/exp03_dropout.png "Experiment 03 Dropout layer"
+
+[exp04_aug5x]: ./assets/exp04_aug5x.png "Experiment 04 nn2 + aug_5x"
+[exp04_aug3k]: ./assets/exp04_aug3k.png "Experiment 04 nn2 + aug_3k"
+
+[exp05_aug5x_100e]: ./assets/exp05_aug5x_100e.png "Experiment 05 100 epochs"
+[exp06_aug5x_100e_lr5e-4]: ./assets/exp06_aug5x_100e_lr5e-4.png "Experiment 06 100 epochs lr=5e-4"
+
+[exp07_ms_rgb]: ./assets/exp07_ms_rgb.png "Experiment 07 Multi-scale RGB"
+[exp07_ms_y]: ./assets/exp07_ms_y.png "Experiment 07 Multi-scale Y"
+
+[exp08_early_stopping]: ./assets/exp08_nn3_early_stopping.png "Early stopping"
+
+[test_images]:        ./assets/test_images.png        "Test Images"
+[test_images_scaled]: ./assets/test_images_scaled.png "Test images scaled"
+[top_5]: ./assets/top_5.png "Top 5 Predictions"
+
 
 ## Rubric Points
 Here I will consider the [rubric points](https://review.udacity.com/#!/rubrics/481/view) individually and describe how I addressed each point in my implementation.  
@@ -74,7 +88,7 @@ test-label is subset of train-labels: True
 First I visualize the data-images (selected randomly) with their labels and number of samples for training data
 <center>
 
-![alt text][image1]
+![alt text][training_input]
 
 </center>
 
@@ -93,37 +107,11 @@ We can see that they have similar shape where some labels have a lot of samples 
 
 ### Design and Test a Model Architecture
 
-Insipered by [baseline model](http://yann.lecun.com/exdb/publis/pdf/sermanet-ijcnn-11.pdf), I try to re-produce the result from it. 
+In the project it suggests to use LeNet5 as a start point and it also introduces the [baseline model](http://yann.lecun.com/exdb/publis/pdf/sermanet-ijcnn-11.pdf). We will use both (with some modifications) in this project. 
 
 #### 1. Pre-processing dataset
 
-##### 1.1 RGB to YUV
-As a first step, I decided to convert the images to YUV because
-
-* it allows to use gray-scale image (by using Y channel)
-* it also allows to use color (by using UV channel)
-* from [wiki](https://en.wikipedia.org/wiki/YUV), YUV encodes image while taking *human perception* into account
-* it's used in baseline model which I want to re-produce its result.  
-
-This step is implemented in function `rgb2yuv`
-  
-Here is an example of a traffic sign image taking only Y channel
-
-<center>
-
-![alt text][rgb_vs_y]
-
-</center>
-
-We can see that the grayscale is easier to visualize than the color one. 
-
-As a last step, following a suggestion in paper [Efficient BackProp](http://yann.lecun.com/exdb/publis/pdf/lecun-98b.pdf), we normalize the inputs by doing
-
-* scale inputs to range [0.0, 1.0] (by dividing to 255.0)
-* minus 0.5 to make them contains both positive and negative values
-
-  
-##### 1.2 Data augmentation
+##### 1.1 Data augmentation
 
 Looking at available we observe
 
@@ -132,234 +120,288 @@ Looking at available we observe
   
 So we decided to generate additional data using the following techniques (as suggested in baseline model): 
 
-* rotatation with degree randomly selected in [-15.0, 15.0]
+* rotatation with degree randomly selected in [-10.0, 10.0]
 * projection which is a combination of shearing + scaling
+
+An jittered image is created by a rotation following by a projection. Note that we need to scale it back into `uint8` as original input.
 
 The implementation uses `skimage.transform` to facilitate the tasks. Let's look at an example of augmented images: 
 
 <center>
 
-![alt text][gen_data]
+![alt text][jittered_examples]
 
 </center>
 
 The augmented data will help to prevent overfitting and also to make our model genelarize better.  
 
+##### 1.2 Preprocessing
+In this section, there are a lot of choice for example
 
-#### 2. Model architecture
+* RGB or grayscale (from now on **Y** mean grayscale)
+* normalized input or not e.t.c
 
-We mimic the baseline model's architecture which described as belows
+We limit to try the following test cases
+1. use RGB and scale it to [0, 1]
+2. use Y and scale it to [0,1]
+3. use RGB and normalized it to have mean 0 and stddev 1.
+4. use Y and normalized it
 
-* **inputs**: are preprocessed images each having shape of 3@32x32 (we use this notation D@WxH to describe shape of tensor), 
-however we only use gray-scale input channels since it's more visible (as seen above) and as suggested in the baseline model's paper
-* **model-settings**: the following setting can be used to tweak model's structure
-    * `state1`: number of filters connected to Y-channels in the first conv-layer   (default = 108)
-    * `state2`: number of filters in the second conv-layer (default = 108)
-    * `state3`: number of filters in the third conv-layer (default = 0 means that there are 2 conv-layers)
-    * `num_units`: number of hidden units in fully-connected layer for the classifier (default = 300)    
-    * `use_batchnorm`: flag to decide whether to use batch-normalization or not (see [ref](https://arxiv.org/pdf/1502.03167.pdf)). If `use_batchnorm=True` then we will apply **batch-norm** *before each max-pool layer*
-
-* **first state**:
-    * the grayscale Y (1@32x32) input channel is applied conv with kernel-size 5x5 with number of filters = `state1_Y`
-    * the UV (2@32x32) input channels are applied conv with kernel-size 5x5 and with number of filters = `state1_UV`
-    * we concatenate the two ouputs about to obtain a tensor `state1`@32 x 32 
-    * we use ReLU-activation and 2x2 max-pool to create an ouput `state1`@16x16 (named it *conv1*) 
-    
-* **second state**:
-    * output from the **first state** is applied conv with kernel-size 5x5 with number of filters = `state2`
-    * then we use ReLU-activation and 2x2 max-pool to create an output `state2`@8x8 (named it *conv2*)
-    
-* **multi-scale (MS)**  features:
-    * we sub-sample *conv1* by using 4x4 max-pool, then flatten it
-    * we flatten *conv2*
-    * we concatenate the two above to create multi-scale features
-    
-* **classifier with drop-out**:
-    * we use 2-layer (fully connected) with input is the above **(MS)** features 
-    * we use number of hidden units = `num_units`
-    * we apply **drop-out** on activation-output of the first fully-connected layer
-    * the output layer is softmax with cross-entropy loss
-
-The following diagram illustrate the model's architecture for model-setting 
+Let's look some examples RGB v.s Y
 <center>
-`state1=108, state2=200, state3=0 num_units=300`
 
-![alt text][model01]
+![alt text][rgb_vs_y]
 
 </center>
+
+We can see that the grayscale ones are easier to visualize than the color ones since the color ones are too dark.  
+
+#### 2. Model architecture
+We will try two architectures here
+* **LeNet5** as suggested in the project, this has the following architecture 
+<center>
+
+![alt text][model01_lenet5]
+
+</center>
+
+* **Multi-scale** as described in the baseline model, this has the following architecture
+
+<center>
+
+![alt text][model02_multiscale]
+
+</center>
+
+We do the following changes to the original models
+ * we use *ReLu* as activation
+ * for LeNet5 we use 2 conv-net layers with 8-16 filters each, the classifier is the same 
 
 #### 3. Train, Validate and Test model
 
-To train a model we use AdamOptimizer, we monitor training-loss via `sys.stdout.write` or `tensorboard`. 
-Periodically, we measure the prediction-accuracy on sub-sampled of training v.s all validation data. 
-This allows us to check whether we are overfitting e.t.c  
+To train a model, we use `tf.AdamOptimizer` with the following default hyperparameters
 
-We experiment with the following settings
+|               | default  |
+|--------------:|:--------:|
+| learning_rate |  1e-3    |
+| batch_size    |  64      |
 
-* **training dataset**: use both original dataset and augmented one to check if it improves the performance
-* **hyperparameters**:
-    * learning rate: 1e-4, 5e-4, 1e-3 
-    * epochs: in [10, 50] (we stop if we observe overfitting i.e training-accuracy > 99% while validation-accuracy < 93%)
-    * batch_size: 64, 128, 256 
-* **improvement technique**:    
-    * drop-out to prevent overfiting
-    * batch-norm to speed up training
+To facilitate the training/evaluation we implement the following class
+* `NeuralNetwork`: in `nn.py` allows us to construct a net in chaining rule (inspired by `Keras`)
+* `Dataset`: in `data.py` allows us to transform data, generate mini-batches
+* `TrainingSession`: in `train.py` allows us to create/save/load a `tf.Session`
 
-##### 3.1 First trial
+Now, let's train a model for German Traffic Sign recognition 
 
-We use a similar setting described in the baseline model's paper
+##### Experiment 1: LeNet5 RGB of Y
 
-|               | model0  |
-|:-------------:|:-------:|
-| stage1        |  108    |
-| stage2        |  108    |
-| num_units     |  300    |
-| use_batchnorm |  False  |
+In the baseline model, it suggests grayscale performs better. However LeNet5 has different architecture, so first 
+let check whether RGB or Y is better?
  
-Training above model with the original dataset and the following hyperparameters
+We train with original data with 20 epochs
+
+<center>
+
+![alt text][exp01_rgb]
+
+![alt text][exp01_y]
+
+</center>
+
+Looking at above result, we observe 
+
+* for all data-pipelines, our model is well overfitting
+* using only Y-channel is slightly less accuracy than RGB
+
+Since using RGB gives slightly better accuracy, we will keep using RGB for LeNet5 (note this is against what stated in 
+the baseline-model papers but here we use different net's architecture, we will test Y-channel later with 
+multi-scale architecture).
+
+##### Experiment 2: normalized input?
  
-```
-epochs = 15
-batch_size = 64
-learning_rate = 5e-4
-eval_every = 100
-keep_prob = 1.0
-```
+As suggested in the paper [Efficient Backprop](http://yann.lecun.com/exdb/publis/pdf/lecun-98b.pdf) by Yann LeCunn et al. 
+Let's test whether if normalized input helps
 
-After training, we obtain
+<center>
 
-|               | train   | validation | test  |
-|:-------------:|:-------:|:----------:|:-----:|
-| accuracy(%)   |  99.84  |   89.18    | 89.80 |
+![alt text][exp02_rgb_scaled]
 
-Looking at the accuracy in function of iterations
-
-<center> 
-
-![alt text][model0_overfit]
+![alt text][exp02_rgb_norm]
 
 </center>
 
-The above curve shows a clear indication of overfitting. To solve overfitting, here we try the following steps
+Looking at above result, it's hard to decide whether we should use normalized inputs or not since validation-accuracy are similar (both are still very overfitting). However we notice that training-accuracy with normalized inputs converge quicker. So we will use normalized input from now on.
+Now let's tackle the over-fitting issue. One can do the following steps
+* use dropout layer
+* train with more data: the augmented one
 
-* apply drop-out
-* train with more data (augmented one)
+##### Experiment 3: Dropout layer
 
+Let's add Dropout layer with keep-prob 0.5 after each fully-connected layer, we obtain the following result after 15 epochs
 
-##### 3.2 Second trial: using drop-out
+<center>
 
-We re-train *model0*  with drop-out of `keep_prob=0.5`.
-Normally, we would increase number of epochs when using drop-out, however here we have few dataset so we don't increase 
-number of epochs (to reduce the risk of overfitting). 
-
-To summarise, the training hyperparameters are
-
-```
-epochs = 15
-batch_size = 64
-learning_rate = 5e-4
-eval_every = 200
-keep_prob = 0.5
-```
-
-After training, we obtain
-
-|               | train   | validation | test  |
-|:-------------:|:-------:|:----------:|:-----:|
-| accuracy(%)   |  99.97  |   94.56    | 93.14 |
-
-Looking at the accuracy in function of iterations
-
-<center> 
-
-![alt text][model0_do]
+![alt text][exp03_dropout]
 
 </center>
 
-It's clear that drop-out helps us to reduce overfitting hence improve validation-accuracy beyond 93%. 
-However it's clear that our model is still overfitting.
+Our model finally passed the 93%, but it's clear that it still overfitting. The accuracy after training is given as belows 
+
+
+|          | train   | validation | test  |
+|:--------:|:-------:|:----------:|:-----:|
+| original |  99.22  |   93.88    | 93.67 |
+
+##### Experiment 4: Train with augmented data
+
+The next step to solve the overfitting issue is to train with more data. Fortunately, we have generated augmented datas
+* aug_5x: is the orginal data + 4x jittered images (we generate 4 jittered images from the original one)
+* aug_3k: is the original data + random jittered images to make each label having 3k samples
+
+Using augmented data we obtain the following result 
+
+<center>
+
+![alt text][exp04_aug5x]
+
+![alt text][exp04_aug3k]
+
+</center>
+
+Oberserving above result, we can see that drop-out + augmented data is very effective at preventing overfitting the learning curve for training and validation accuracy are closer. The accuracy after training is given as belows
+
+|                 | train   | validation | test  |
+|:---------------:|:-------:|:----------:|:-----:|
+| augmentation 5x |  94.95  |   94.33    | 94.18 |
+| augmentation 3k |  96.02  |   94.22    | 92.82 |
+
+Note that the augmentation 3k doesn't work well since its distribution is different from the validation set and the test set. From now on we only use augmentation 5x for this project.
+
+The next step is to consider the following questions
+* Has the learning curve converged?
+* Is the learning rate too high, too low?
+
+##### Experiment 5: Train with more epochs
+
+Looking at the above learning curves, it seems that it hasn't converged yet. Let's try with more epochs, here is the results after training with 100 epochs
+
+<center>
+
+![alt_text][exp05_aug5x_100e]
+
+</center>
+
+With 100 epochs, both training and validation accuracy are improved
+
+|                 | train   | validation | test  |
+|:---------------:|:-------:|:----------:|:-----:|
+| augmentation 5x |  97.41  |   97.35    | 94.62 | 
+
+
+##### Experiment 6: Train with lower learning rate
+
+Looking at the above learning curves, the training accuracy is fluctuating and not improving after 40 epochs. 
+One could try to train with lower learning rate
+
+<center>
+
+![alt_text][exp06_aug5x_100e_lr5e-4]
+
+</center>
+
+We observe that not only the learning-curves are smoother and we obtain a better training accuracy, 
+however validation accuracy is worse
+
+|                 | train   | validation | test  |
+|:---------------:|:-------:|:----------:|:-----:|
+| augmentation 5x |  98.22  |   95.96    | 95.35 |
+
+We think this might be the best that the current model can do. 
+We might need other architecture to improve the accuracy further.
+
+##### Experiment 7: Try multi-scale architecture
+
+Since the baseline model gives a very high accuracy > 98%, it might be worth to try it out. Let's use
+
+* 2 layer conv-net 108-108 filters each
+* multi-scale features: concatenate features from the first conv-layer (after max-pool 4x4) and the second one
+* we use only one fc-layer of 100 hidden units as suggested in the baseline model
+
+The training parameters are
+
+<center>`learning_rate=5e-4, batch_size=128 and epochs=100`</center>
+
+We obtain the following result
+
  
-Now let's try to apply **batch-norm** to see whether if it improves training-speed and accuracy. 
+<center>
 
-Using same hyperparameters, we obtain
+![alt text][exp07_ms_rgb]
 
-|               | train   | validation | test  |
-|:-------------:|:-------:|:----------:|:-----:|
-| accuracy(%)   |  99.90  |   96.05    | 94.23 |
-
-<center> 
-
-![alt text][model1_bn]
+![alt text][exp07_ms_y]
 
 </center>
 
-It's clear that batch-norm improves not only training-speed but also accuracy. We will always turn on batch-norm from now on.
-##### 3.3 Third trial
+The accuracy table is given as belows
 
-Let's reduce the capacity of our model by
+|     | train   | validation | test  |
+|:---:|:-------:|:----------:|:-----:|
+| RGB |  99.94  |   96.92    | 96.79 |
+| Y   |  99.98  |   98.19    | 97.19 |
 
-* only using gray-scale channel
-* only using 64 layers for first conv-layer and 128 for the second conv-layer
+This multi-scale architecture works well with grayscale image, we finally obtain a validation accuracy > 98%.
 
-We have the following settings (called `model2`)
+##### Experiment 8: Try early stopping
 
-|               | model2  |
-|:-------------:|:-------:|
-| stage1_Y      |  64     |
-| stage1_UV     |  0      |
-| stage2        |  128    |
-| num_units     |  200    |
-| use_batchnorm |  False  |
-| l2_reg        |  1e-8   |
+From observing the learning curve, we notice that validation accuracy can archive its maximum before all training epochs are done. 
+There is a technique called `early-stopping` that suggests to use this state instead of the final state. 
 
-Using the same hyperparameters as before
-```
-epochs = 15
-batch_size = 64
-learning_rate = 5e-4
-eval_every = 200
-keep_prob = 0.4
-```
+We try this with multi-scale model and grayscale images:
 
-We obtain
+<center>
 
-|               | train   | validation | test  |
-|:-------------:|:-------:|:----------:|:-----:|
-| accuracy(%)   |  99.83  |   94.29    | 94.22 |
-
-with following training/validation accuracy curves
-
-<center> 
-
-![alt text][model2_bn]
+![alt text][exp08_early_stopping]
 
 </center>
 
-Reducing capacity doesn't help when training with original data.
+The early stopping have the following accuracy
 
-##### 3.4 Fourth trail: train with augmented data
+|     | train   | validation | test  |
+|:---:|:-------:|:----------:|:-----:|
+| Y   |  99.66  |   98.32    | 96.24 |
+
+We will use this as our final model since it's validation accuracy is highest.
 
 
 
-####4. Describe the approach taken for finding a solution and getting the validation set accuracy to be at least 0.93. Include in the discussion the results on the training, validation and test sets and where in the code these were calculated. Your approach may have been an iterative process, in which case, outline the steps you took to get to the final solution and why you chose those steps. Perhaps your solution involved an already well known implementation or architecture. In this case, discuss why you think the architecture is suitable for the current problem.
+####4. Model selection
 
+Going through a series of experiments, we choose the final model to be the multi-scale model
+with following architecture
+* 108-108 conv-net 
+* one fc with 100 hidden units
+* dropout with keep_prob=0.5
+
+The training set is the gray-scale images of augmented data 5x. 
+ 
 My final model results were:
-* training set accuracy of ?
-* validation set accuracy of ? 
-* test set accuracy of ?
 
-If an iterative approach was chosen:
-* What was the first architecture that was tried and why was it chosen?
-* What were some problems with the initial architecture?
-* How was the architecture adjusted and why was it adjusted? Typical adjustments could include choosing a different model architecture, adding or taking away layers (pooling, dropout, convolution, etc), using an activation function or changing the activation function. One common justification for adjusting an architecture would be due to overfitting or underfitting. A high accuracy on the training set but low accuracy on the validation set indicates over fitting; a low accuracy on both sets indicates under fitting.
-* Which parameters were tuned? How were they adjusted and why?
-* What are some of the important design choices and why were they chosen? For example, why might a convolution layer work well with this problem? How might a dropout layer help with creating a successful model?
+|                                        | train   | validation | test  |
+|---------------------------------------:|:-------:|:----------:|:-----:|
+| multi-scale 108-108 fc 100 dropout 0.5 |  99.66  |   98.32    | 96.24 |
 
-If a well known architecture was chosen:
-* What architecture was chosen?
-* Why did you believe it would be relevant to the traffic sign application?
-* How does the final model's accuracy on the training, validation and test set provide evidence that the model is working well?
- 
+Go through the experiments we learnt
+* RGB or Y depends on neural net's architecture, when the net is fairly small RGB performs slightly better than Y.
+However when the net is big, RGB tends to overfit quicker.
+* Deep neural net can easily overfit training data
+* To solve overfitting: combination of dropout + augmented data is very effective
+* when the learning-curve is fluctuating, reducing learning rate helps
+
+There are a lot more to be experiment with
+* Tunning batch-size (we notice that small batch-size converge quicker in term of number of epochs but runs slower in term of number seconds per epoch)
+* Tunning learning-rate by using random learning-rate
+* Try other model parameter e.g number of layers for conv-net, number of hidden-unit for fully-connected layers
+* Try batch-normalization layer
 
 ###Test a Model on New Images
 
@@ -367,42 +409,49 @@ If a well known architecture was chosen:
 
 Here are five German traffic signs that I found on the web:
 
-![alt text][image4] ![alt text][image5] ![alt text][image6] 
-![alt text][image7] ![alt text][image8]
+<center>
 
-The first image might be difficult to classify because ...
+![alt text][test_images]
 
-####2. Discuss the model's predictions on these new traffic signs and compare the results to predicting on the test set. At a minimum, discuss what the predictions were, the accuracy on these new predictions, and compare the accuracy to the accuracy on the test set (OPTIONAL: Discuss the results in more detail as described in the "Stand Out Suggestions" part of the rubric).
+</center>
 
-Here are the results of the prediction:
+We can see that images comes in different shape and quality, since our net only accept 32x32 we need to rescale it
+<center>
 
-| Image			        |     Prediction	        					| 
-|:---------------------:|:---------------------------------------------:| 
-| Stop Sign      		| Stop sign   									| 
-| U-turn     			| U-turn 										|
-| Yield					| Yield											|
-| 100 km/h	      		| Bumpy Road					 				|
-| Slippery Road			| Slippery Road      							|
+![alt text][test_images_scaled]
 
+</center>
 
-The model was able to correctly guess 4 of the 5 traffic signs, which gives an accuracy of 80%. This compares favorably to the accuracy on the test set of ...
+After images resized, even human might find it's difficult to classify some of the above images.
 
-####3. Describe how certain the model is when predicting on each of the five new images by looking at the softmax probabilities for each prediction. Provide the top 5 softmax probabilities for each image along with the sign type of each probability. (OPTIONAL: as described in the "Stand Out Suggestions" part of the rubric, visualizations can also be provided such as bar charts)
+####2. Here is prediction result along with top-k probability
+Here is the table of true labels v.s predictions
 
-The code for making predictions on my final model is located in the 11th cell of the Ipython notebook.
+|  image      |           label        | prediction              |
+|------------:|:----------------------:|:-----------------------:|
+| test_01.jpg |   Speed limit (30km/h) |    Speed limit (30km/h) |
+| test_02.jpg |   Stop                 |    Stop                 |
+| test_03.jpg |   Children crossing    |    Slippery road        |
+| test_04.jpg |   Prioriy road         |    Prioriy road         |
+| test_05.jpg |   Right-of-way...      |    Right-of-way...      |
+| test_06.jpg |   General caution      |    General caution      |
+| test_07.jpg |   Yield                |    Yield                |
+| test_08.jpg |   Keep right           |    Keep right           |
+| test_09.jpg |   Roundabout...        |    Roundabout...        |
+| test_10.jpg |   Pedestrians          |    Pedestrians          |
 
-For the first image, the model is relatively sure that this is a stop sign (probability of 0.6), and the image does contain a stop sign. The top five soft max probabilities were
+The prediction accuracy is 90% with the failed case is `test_03.jpg`, but we can see the resized `test_03.jpg` looks like a slippery road so it's understandable that our net made mistake here.
 
-| Probability         	|     Prediction	        					| 
-|:---------------------:|:---------------------------------------------:| 
-| .60         			| Stop sign   									| 
-| .20     				| U-turn 										|
-| .05					| Yield											|
-| .04	      			| Bumpy Road					 				|
-| .01				    | Slippery Road      							|
+Let's the top-5 softmax probabilities
 
+<center>
 
-For the second image ... 
+![alt text][top_5]
+
+</center>
+
+The net is very confident on 9/10 images except for the `test_03.jpg`. We can see that the net is confused since the resized image look similar to all top-5 labels.
+
 
 ### (Optional) Visualizing the Neural Network (See Step 4 of the Ipython notebook for more details)
 ####1. Discuss the visual output of your trained network's feature maps. What characteristics did the neural network use to make classifications?

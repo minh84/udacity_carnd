@@ -229,6 +229,16 @@ class NeuralNetwork(object):
 
         return session.run(self._top_k, feed_dict = self.get_feed_dict(inputs))
 
+    def get_layers(self, session, inputs, layer_ids):
+        ops = []
+        for layer_id in layer_ids:
+            if layer_id not in self._layers:
+                raise Exception('Layer {} is not in current net, it only has following layers\n\t{}'.format(layer_id,
+                                                                                                            '\n\t'.join(self._layers.keys())))
+            ops.append(self._layers[layer_id])
+
+        return session.run(ops, feed_dict = self.get_feed_dict(inputs))
+
     @property
     def loss_op(self):
         return self._loss_op

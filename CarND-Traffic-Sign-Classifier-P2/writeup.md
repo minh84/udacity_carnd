@@ -44,6 +44,13 @@ The goals / steps of this project are the following:
 [test_images_scaled]: ./assets/test_images_scaled.png "Test images scaled"
 [top_5]: ./assets/top_5.png "Top 5 Predictions"
 
+[vis_con_01]: ./assets/vis_con_01.png "Visualize Conv 01"
+[vis_con_02]: ./assets/vis_con_02.png "Visualize Conv 02"
+
+[vis_inputs]: ./assets/vis_inputs.png "Visualize Conv 01"
+[vis_input0]: ./assets/vis_input0.png "Visualize Conv 02"
+[vis_input1]: ./assets/vis_input1.png "Visualize Conv 01"
+
 
 ## Rubric Points
 Here I will consider the [rubric points](https://review.udacity.com/#!/rubrics/481/view) individually and describe how I addressed each point in my implementation.  
@@ -456,4 +463,28 @@ The net is very confident on 9/10 images except for the `test_03.jpg`. We can se
 ### (Optional) Visualizing the Neural Network (See Step 4 of the Ipython notebook for more details)
 ####1. Discuss the visual output of your trained network's feature maps. What characteristics did the neural network use to make classifications?
 
+Let's visualize conv-net layer for LeNet5 architecture
 
+
+<center>
+
+![alt text][vis_con_01]
+![alt text][vis_con_02]
+
+</center>
+
+We notice that the `FeatureMap 4` of the first layer seem to be activated via shape, the second one is not easy to interpretable. Now let's look an image that has a lot of traffic sign in it and an image that has a dog
+
+<center>
+
+![alt text][vis_inputs]
+![alt text][vis_input0]
+![alt text][vis_input1]
+
+</center>
+
+The first layer looks more noisy than before but looking at `FeatureMap 4`, it still looks like shape of the front image.
+
+In the scope of this project, we won't look further on visualizing deep layers but if you are interested there are few interesting papers on this
+* Understanding Neural Networks Through Deep Visualization by [Yosinski et al.](http://www.evolvingai.org/files/2015_Yosinski_ICML.pdf)
+* Visualizing and Understanding Convolutional Networks by [Zeiler  et al.](https://www.cs.nyu.edu/~fergus/papers/zeilerECCV2014.pdf)

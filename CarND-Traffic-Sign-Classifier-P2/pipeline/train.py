@@ -41,6 +41,9 @@ class TrainingSession(object):
     def top_k(self, inputs):
         return self._net.top_k(self, inputs)
 
+    def get_layers(self, inputs, layer_ids):
+        return self._net.get_layers(self, inputs, layer_ids)
+
     def score(self, dataset, batch_size):
         preds = []
         for inputs,_ in dataset.get_batches(batch_size):

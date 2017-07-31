@@ -53,20 +53,6 @@ def random_flip(img, steering):
     else:
         return np.fliplr(img), -steering
 
-
-def random_translate(img, steering, range_x, range_y):
-    # see example from
-    #    http://docs.opencv.org/3.0-beta/doc/py_tutorials/py_imgproc/py_geometric_transformations/py_geometric_transformations.html
-    trans_x = range_x * (np.random.uniform() - 0.5)
-    trans_y = range_y * (np.random.uniform() - 0.5)
-
-    steering += trans_x * 0.002
-    trans_matrix = np.float32([[1, 0, trans_x], [0, 1, trans_y]])
-    H, W, _ = img.shape
-
-    return cv2.warpAffine(img, trans_matrix, (W, H)), steering
-
-
 def random_shadow(img):
     H, W, _ = img.shape
 
@@ -103,6 +89,17 @@ def random_brightness(img):
     # convert back to RGB
     return cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
 
+def random_translate(img, steering, range_x, range_y):
+    # see example from
+    #    http://docs.opencv.org/3.0-beta/doc/py_tutorials/py_imgproc/py_geometric_transformations/py_geometric_transformations.html
+    trans_x = range_x * (np.random.uniform() - 0.5)
+    trans_y = range_y * (np.random.uniform() - 0.5)
+
+    steering += trans_x * 0.002
+    trans_matrix = np.float32([[1, 0, trans_x], [0, 1, trans_y]])
+    H, W, _ = img.shape
+
+    return cv2.warpAffine(img, trans_matrix, (W, H)), steering
 
 def get_jittered_data(img, steering):
     img = mpimg.imread(img)
@@ -110,14 +107,14 @@ def get_jittered_data(img, steering):
     # random flip
     img, steering = random_flip(img, steering)
 
-    # random translate
-    # img, steering = random_translate(img, steering, 80, 10)
-
     # random shadow
     img = random_shadow(img)
 
     # random brightness
     img = random_brightness(img)
+
+    # random translate
+    img, steering = random_translate(img, steering, 80, 10)
 
     return img, steering
 
@@ -243,7 +240,9 @@ def split_data(dataset, split_frac):
     train = pandas.DataFrame(train.values, columns=dataset.columns)
     valid = pandas.DataFrame(valid.values, columns=dataset.columns)
 
+    print('\n-------------------------------------------------')
     print('training-samples   {}'.format(train.shape[0]))
     print('validation-samples {}'.format(valid.shape[0]))
+    print('-------------------------------------------------\n')
 
     return train, valid

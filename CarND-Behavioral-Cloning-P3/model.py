@@ -4,8 +4,9 @@ from keras.optimizers import Adam
 from keras import callbacks
 
 import argparse
+from matplotlib import pyplot as plt
 
-from .utils import INPUT_SHAPE, load_data, split_data, train_generator, valid_generator
+from utils import INPUT_SHAPE, load_data, split_data, train_generator, valid_generator
 
 def build_nvidia(input_shape, kinit='glorot_uniform', activation='elu', keep_prob=0.5):
     model = Sequential()
@@ -31,7 +32,7 @@ def build_nvidia(input_shape, kinit='glorot_uniform', activation='elu', keep_pro
 
     # flatten
     model.add(Flatten(name='flatten'))
-    model.add(Dropout(keep_prob, name='dropout_conv'))
+    #model.add(Dropout(keep_prob, name='dropout_conv'))
 
     # fully-connected layers
     hidden_dims = [100, 50, 10]
@@ -65,10 +66,10 @@ def train_model(model,
     save_best = callbacks.ModelCheckpoint(best_file, save_best_only=True)
 
     # train-loop
-    model.fit_generator(train_data_gen, steps_per_epoch, epochs,
-                        validation_data=valid_data_gen,
-                        validation_steps=validation_steps,
-                        callbacks=[save_best])
+    history_object = model.fit_generator(train_data_gen, steps_per_epoch, epochs,
+                                         validation_data=valid_data_gen,
+                                         validation_steps=validation_steps,
+                                         callbacks=[save_best])
 
     # save trained model
     model.save(save_file)
@@ -78,6 +79,8 @@ def train_model(model,
     print('Training is done, model is saved to')
     print('\tlast epoch      {}'.format(save_file))
     print('\tbest validation {}'.format(best_file))
+
+    return history_object
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -92,7 +95,7 @@ if __name__ == '__main__':
     parser.add_argument('--steer_corr',   help='steering correction',    dest='steer_corr', type=float, default=0.2)
 
     # training parameters
-    parser.add_argument('-n', help='number of epochs', dest='nb_epochs',  type=int, default=10)
+    parser.add_argument('-n', help='number of epochs', dest='nb_epochs',  type=int, default=20)
     parser.add_argument('-b', help='batch size',       dest='batch_size', type=int, default=32)
     parser.add_argument('--learning_rate', help='learning rate', dest='learning_rate', type=float, default=1e-4)
     parser.add_argument('--save_file',     help='output file after last epoch',   dest='save_file', type=str, default='model_last.h5')
@@ -122,11 +125,30 @@ if __name__ == '__main__':
     steps_per_epoch  = train.shape[0] // args.batch_size
     validation_steps = valid.shape[0] // args.batch_size
 
+    print('\n-------------------------------------------------')
+    print('Start training with following hyperparameters')
+    print('\tnumber of epochs {}'.format(args.nb_epochs))
+    print('\tlearning rate    {:.2e}'.format(args.learning_rate))
+    print('-------------------------------------------------\n')
+
     # train model
-    train_model(model,
-                train_gen, steps_per_epoch,
-                valid_gen, validation_steps,
-                learning_rate=args.learning_rate,
-                save_file=args.save_file,
-                best_file=args.best_file)
+    history_object = train_model(model,
+                                 train_gen, steps_per_epoch,
+                                 valid_gen, validation_steps,
+                                 args.nb_epochs,
+                                 learning_rate=args.learning_rate,
+                                 save_file=args.save_file,
+                                 best_file=args.best_file)
+
+    ### print the keys contained in the history object
+    print(history_object.history.keys())
+
+    ### plot the training and validation loss for each epoch
+    plt.plot(history_object.history['loss'])
+    plt.plot(history_object.history['val_loss'])
+    plt.title('model mean squared error loss')
+    plt.ylabel('mean squared error loss')
+    plt.xlabel('epoch')
+    plt.legend(['training set', 'validation set'], loc='upper right')
+    plt.show()
 

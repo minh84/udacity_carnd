@@ -60,7 +60,7 @@ Here I will consider the [rubric points](https://review.udacity.com/#!/rubrics/4
 
 You're reading it! and here is a link to my [submission files]()
 
-* `Traaffic_Sign_Classifier.ipynb` contains all the code for this project which we will walk through in the following sections.
+* `Traffic_Sign_Classifier.ipynb` contains all the code for this project which we will walk through in the following sections.
 * `writeup.md` is the report that you are reading.
 
 ### Data Set Summary & Exploration

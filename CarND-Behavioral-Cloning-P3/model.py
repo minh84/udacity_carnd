@@ -140,8 +140,6 @@ if __name__ == '__main__':
                                  save_file=args.save_file,
                                  best_file=args.best_file)
 
-    ### print the keys contained in the history object
-    print(history_object.history.keys())
 
     ### plot the training and validation loss for each epoch
     plt.plot(history_object.history['loss'])

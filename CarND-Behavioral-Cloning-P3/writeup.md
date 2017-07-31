@@ -21,6 +21,8 @@ The goals / steps of this project are the following:
 
 [multi_camera]: ./assets/carnd-using-multiple-cameras.png "Multi camera"
 
+[exp_01]: ./assets/exp01.png "Experiment 01"
+
 ## Rubric Points
 Here I will consider the [rubric points](https://review.udacity.com/#!/rubrics/432/view) individually and describe how I addressed each point in my implementation.
 
@@ -242,8 +244,8 @@ The default training parameters are
 | epochs        |  20      |
 
 We chose above default parameters since
- * `learning_rate=1e-4` since with the default `learning_rate=1e-3` training stops at high loss
- * `batch_size=32` seems working better than 64
+ * `learning_rate=1e-4` since with `learning_rate=1e-3` training stops at high loss
+ * `batch_size=32` to reduce the risk of stucking at a local minimum
  * `epochs=20` since we observe that validation-loss doesn't improve after that 
 
 ##### Experiment 1:
@@ -257,10 +259,20 @@ Using above model, we try the following augmentation setting
 
 We obtain
 
+<center>
 
+![alt text][exp_01]
 
-|               | loss     | val_loss |
-|--------------:|:--------:|:--------:|
-| model_best    |      |
-| model_last    |  32      |
+</center>
+
+Using the two trained models, we run the simulator in Autonomous mode. We observe that
+* `model_last.h5` works better than `model_best.h5`
+* using lower speed makes the care more stable, so we set the `speed=20`.
+* the car drifting left/right for first few
+
+The video for this experience is called `exp01_track1.mp4` where the car ran 2 laps of track1.
+
+Both models fail on track2.
+
+##### Experiment 2:
 

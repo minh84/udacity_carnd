@@ -114,7 +114,7 @@ def get_jittered_data(img, steering):
     img = random_brightness(img)
 
     # random translate
-    img, steering = random_translate(img, steering, 80, 10)
+    img, steering = random_translate(img, steering, 40, 20)
 
     return img, steering
 

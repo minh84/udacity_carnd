@@ -89,19 +89,13 @@ def random_brightness(img):
     # convert back to RGB
     return cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
 
-def random_translate(img, steering, range_x, range_y):
-    # see example from
-    #    http://docs.opencv.org/3.0-beta/doc/py_tutorials/py_imgproc/py_geometric_transformations/py_geometric_transformations.html
-    trans_x = range_x * (np.random.uniform() - 0.5)
-    trans_y = range_y * (np.random.uniform() - 0.5)
-
-    steering += trans_x * 0.002
-    trans_matrix = np.float32([[1, 0, trans_x], [0, 1, trans_y]])
-    H, W, _ = img.shape
-
-    return cv2.warpAffine(img, trans_matrix, (W, H)), steering
-
 def get_jittered_data(img, steering):
+    '''
+    Augmentation image: randomly flip left-right, randomly adding shadow, randomly adjust brightness
+    :param img: 
+    :param steering: 
+    :return: 
+    '''
     img = mpimg.imread(img)
 
     # random flip
@@ -113,14 +107,11 @@ def get_jittered_data(img, steering):
     # random brightness
     img = random_brightness(img)
 
-    # random translate
-    img, steering = random_translate(img, steering, 40, 20)
-
     return img, steering
 
 def get_next_train_data(dataset, row_idx, use_multiple_camera, correction):
     '''
-    
+    Randomly chose between left/center/right camera
     :param dataset: 
     :param row_idx: 
     :param use_multiple_camera: 
@@ -136,6 +127,15 @@ def get_next_train_data(dataset, row_idx, use_multiple_camera, correction):
 
 
 def train_generator(dataset, input_size, batch_size, correction, use_multiple_camera=True):
+    '''
+    training data generator
+    :param dataset: pandas.DataFrame
+    :param input_size: shape of input
+    :param batch_size: batch size
+    :param correction: multi camera correction
+    :param use_multiple_camera: flag to decide whether to use multi-camera or not
+    :return: 
+    '''
     num_samples = dataset.shape[0]
     inputs = np.zeros((batch_size, *input_size), dtype=np.uint8)
     targets = np.zeros((batch_size), dtype=np.float32)

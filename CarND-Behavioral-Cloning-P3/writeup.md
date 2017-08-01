@@ -22,6 +22,10 @@ The goals / steps of this project are the following:
 [multi_camera]: ./assets/carnd-using-multiple-cameras.png "Multi camera"
 
 [exp_01]: ./assets/exp01.png "Experiment 01"
+[exp_02]: ./assets/exp02.png "Experiment 02"
+[exp_03]: ./assets/exp03.png "Experiment 03"
+[exp_04]: ./assets/exp04.png "Experiment 04"
+
 
 ## Rubric Points
 Here I will consider the [rubric points](https://review.udacity.com/#!/rubrics/432/view) individually and describe how I addressed each point in my implementation.
@@ -125,21 +129,6 @@ We convert image into HSV color-space then adjust the V (brighness) value. The r
 
 This is implemented in `utils.random_brightness`.
 
-##### Randomly translate the image
-We translate the image in both x and y direction
-* `dx` in x direction: we need to adjust the steering angle = 0.002 x dx
-* `dy` in y direction: to simulate the road is up-hill/down-hill
-
-Here is an example of translated image
-
-<center>
-
-![alt text][img_translated]
-
-</center>
-
-This is implemented in `utils.random_translate`.
-
 ##### Randomly select from left, center and right camera
 From training data, we have left and right camera. As suggested from the project pages, one can use left/right
 camera in addition to the center one to generate more data. The main idea is as the following
@@ -241,23 +230,19 @@ The default training parameters are
 |--------------:|:--------:|
 | learning_rate |  1e-4    |
 | batch_size    |  32      |
-| epochs        |  20      |
 
 We chose above default parameters since
  * `learning_rate=1e-4` since with `learning_rate=1e-3` training stops at high loss
  * `batch_size=32` to reduce the risk of stucking at a local minimum
- * `epochs=20` since we observe that validation-loss doesn't improve after that 
 
-##### Experiment 1:
+##### Experiment 1
 Using above model, we try the following augmentation setting
 
 |                     | value     |
 |--------------------:|:---------:|
 | steering correction |  0.2      |
-| dx range            |  [-40,40] |
-| dy range            |  [-5,5]   |
 
-We obtain
+We train with 100 epochs, the model's MSE is given below 
 
 <center>
 
@@ -265,14 +250,79 @@ We obtain
 
 </center>
 
-Using the two trained models, we run the simulator in Autonomous mode. We observe that
-* `model_last.h5` works better than `model_best.h5`
-* using lower speed makes the care more stable, so we set the `speed=20`.
-* the car drifting left/right for first few
+We notice that after 80 epochs, model starts overfitting. 
 
-The video for this experience is called `exp01_track1.mp4` where the car ran 2 laps of track1.
+We try both models `model_last.h5` and `model_best.h5`, both drive through track1 succesfully. 
+However, we observe that both has some issue with the conner after the bridge (see exp1_track1.mp4 for more detail).
 
-Both models fail on track2.
+##### Experiment 2
+We add a Dropout layer after the last conv-layer, this has similar effect as averaging over models (ensemble technique) also it helps to combat overfitting. The model has following architecture
 
-##### Experiment 2:
+```
+Layer (type)                 Output Shape              Param #
+=================================================================
+normalize (Lambda)           (None, 66, 200, 3)        0
+_________________________________________________________________
+conv1 (Conv2D)               (None, 31, 98, 24)        1824
+_________________________________________________________________
+conv2 (Conv2D)               (None, 14, 47, 36)        21636
+_________________________________________________________________
+conv3 (Conv2D)               (None, 5, 22, 48)         43248
+_________________________________________________________________
+conv4 (Conv2D)               (None, 3, 20, 64)         27712
+_________________________________________________________________
+conv5 (Conv2D)               (None, 1, 18, 64)         36928
+_________________________________________________________________
+flatten (Flatten)            (None, 1152)              0
+_________________________________________________________________
+dropout_conv (Dropout)       (None, 1152)              0
+_________________________________________________________________
+hidden1 (Dense)              (None, 100)               115300
+_________________________________________________________________
+hidden2 (Dense)              (None, 50)                5050
+_________________________________________________________________
+hidden3 (Dense)              (None, 10)                510
+_________________________________________________________________
+output (Dense)               (None, 1)                 11
+=================================================================
+Total params: 252,219
+Trainable params: 252,219
+Non-trainable params: 0
+```
 
+The MSE with Dropout has following profile
+
+ <center>
+
+![alt text][exp_02]
+
+</center>
+
+It's clear that model is not overfitting. And the both models perform well on track1. However, we found that `model_last.h5` drives slightly better (this might due to the quality of validation data).
+
+We saved `exp2_track1.mp4` using `model_last.h5` while running the car two laps around track1.
+
+##### Experiment 3
+
+Still using model with Dropout layer, we try other `steering_correction=0.15 or 0.25`
+ 
+ <center>
+
+![alt text][exp_03]
+
+![alt text][exp_04]
+
+</center>
+
+It's clear that with `steering_correction=0.15`, we obtain better mse-loss (in both training/validation set). And indeed, the trained model drives the car better: more smoothly control and well positioning the car in the middle of the road (see exp3_track1.mp4).
+
+#### Final model
+We chose NVIDIA model with Dropout layer after the last conv-net and we use `steering_correction=0.15`.
+
+## Conclusion
+From the project, we learnt how to use CNN to control the steering angle. Data augmentation + Dropout works very well against overfitting and it helps model to generalise better.
+
+The trained model drives autonomously through track1 but fails on track2. 
+We observe that the track2 is hard since it contain two lane and it also has the hill up/down which doesn't exists in track1 and when it starts there two roads appear in the same image. 
+
+We stop here for now but in the future we would collect training data on both track1 & track2 and let the model trained with combined data.  

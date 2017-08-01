@@ -3,12 +3,13 @@ from keras.layers import Conv2D, Flatten, Dense, Dropout, Lambda
 from keras.optimizers import Adam
 from keras import callbacks
 
-import argparse
+import argparse, pickle
+
 from matplotlib import pyplot as plt
 
 from utils import INPUT_SHAPE, load_data, split_data, train_generator, valid_generator
 
-def build_nvidia(input_shape, kinit='glorot_uniform', activation='elu', keep_prob=0.5):
+def build_nvidia(input_shape, kinit='glorot_uniform', activation='elu', use_dropout = True, keep_prob=0.5):
     model = Sequential()
 
     # simple normalization
@@ -32,7 +33,8 @@ def build_nvidia(input_shape, kinit='glorot_uniform', activation='elu', keep_pro
 
     # flatten
     model.add(Flatten(name='flatten'))
-    #model.add(Dropout(keep_prob, name='dropout_conv'))
+    if use_dropout:
+        model.add(Dropout(keep_prob, name='dropout_conv'))
 
     # fully-connected layers
     hidden_dims = [100, 50, 10]
@@ -56,8 +58,9 @@ def train_model(model,
                 valid_data_gen, validation_steps,
                 epochs,
                 learning_rate=1e-4,
-                save_file='model.h5',
-                best_file='model_best.h5'):
+                save_file='model_last.h5',
+                best_file='model_best.h5',
+                history_file='history.pkl'):
 
     optimizer = Adam(lr=learning_rate)
     model.compile(loss='mse', optimizer=optimizer)
@@ -74,20 +77,26 @@ def train_model(model,
     # save trained model
     model.save(save_file)
 
+    # save history
+    with open(history_file, 'wb') as f:
+        pickle.dump(history_object.history, f)
+
     # print some logging
     print('\n-------------------------------------')
     print('Training is done, model is saved to')
     print('\tlast epoch      {}'.format(save_file))
     print('\tbest validation {}'.format(best_file))
+    print('Training history is saved to {}'.format(history_file))
 
-    return history_object
+    return history_object.history
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # model parameters
     parser.add_argument('-a', help='activation type', dest='activation', type=str, default='elu')
-    parser.add_argument('--kernel_init', help='weight initializer', dest='kernel_init', type=str,   default='glorot_uniform')
-    parser.add_argument('--keep_prob',   help='keep probability',   dest='keep_prob',   type=float, default=0.5)
+    parser.add_argument('--kernel_init', help='weight initializer',     dest='kernel_init', type=str,   default='glorot_uniform')
+    parser.add_argument('--use_dropout', help='add dropout after conv', dest='use_dropout', action='store_true')
+    parser.add_argument('--keep_prob',   help='keep probability',       dest='keep_prob',   type=float, default=0.5)
 
     # data parameters
     parser.add_argument('-d', help='data directory',                   dest='data_dir',   type=str, default='data')
@@ -101,12 +110,17 @@ if __name__ == '__main__':
     parser.add_argument('--save_file',     help='output file after last epoch',   dest='save_file', type=str, default='model_last.h5')
     parser.add_argument('--best_file',     help='output file with best val-loss', dest='best_file', type=str, default='model_best.h5')
 
+    # save history file
+    parser.add_argument('--hist_file', help='output file with best val-loss', dest='hist_file', type=str,
+                        default='history.pkl')
+
     args = parser.parse_args()
 
     # build model
     model = build_nvidia(INPUT_SHAPE,
                          kinit=args.kernel_init,
                          activation=args.activation,
+                         use_dropout=args.use_dropout,
                          keep_prob=args.keep_prob)
 
     # print model summary
@@ -132,21 +146,22 @@ if __name__ == '__main__':
     print('-------------------------------------------------\n')
 
     # train model
-    history_object = train_model(model,
-                                 train_gen, steps_per_epoch,
-                                 valid_gen, validation_steps,
-                                 args.nb_epochs,
-                                 learning_rate=args.learning_rate,
-                                 save_file=args.save_file,
-                                 best_file=args.best_file)
+    history = train_model(model,
+                         train_gen, steps_per_epoch,
+                         valid_gen, validation_steps,
+                         args.nb_epochs,
+                         learning_rate=args.learning_rate,
+                         save_file=args.save_file,
+                         best_file=args.best_file,
+                         history_file=args.hist_file)
 
 
     ### plot the training and validation loss for each epoch
-    plt.plot(history_object.history['loss'])
-    plt.plot(history_object.history['val_loss'])
-    plt.title('model mean squared error loss')
-    plt.ylabel('mean squared error loss')
-    plt.xlabel('epoch')
-    plt.legend(['training set', 'validation set'], loc='upper right')
-    plt.show()
+    # plt.plot(history['loss'])
+    # plt.plot(history['val_loss'])
+    # plt.title('model mean squared error loss')
+    # plt.ylabel('mean squared error loss')
+    # plt.xlabel('epoch')
+    # plt.legend(['training set', 'validation set'], loc='upper right')
+    # plt.show()
 

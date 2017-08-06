@@ -314,7 +314,7 @@ def draw_lane_area(in_img, binary_warped, left_right_fits):
                 1.0, (255, 255, 255), 2, cv2.LINE_AA)
 
     cv2.putText(img,
-                'Vehical is of {:.2f}m {} of center'.format(pos_offset, left_or_right),
+                'Vehical is of {:.2f}m{}of center'.format(np.abs(pos_offset), left_or_right),
                 (30, 80), cv2.FONT_HERSHEY_COMPLEX,
                 1.0, (255, 255, 255), 2, cv2.LINE_AA)
 

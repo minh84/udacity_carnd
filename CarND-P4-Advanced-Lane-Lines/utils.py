@@ -1,6 +1,9 @@
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+import os, time
+from moviepy.editor import VideoFileClip
 
 def show_img(img, label, ax=None, cmap=None,figsize=(10,5)):
     '''
@@ -17,8 +20,13 @@ def show_img(img, label, ax=None, cmap=None,figsize=(10,5)):
     ax.imshow(img, cmap=cmap)
     ax.axis('off')
 
+def grid_view(imgs, labels, figsize, nrows, ncols, sharex=True, sharey=True, cmaps = {}):
+    fig, axes = plt.subplots(figsize=figsize, nrows=nrows, ncols=ncols, sharey=sharex, sharex=sharey)
+    for i, ax in enumerate(axes.flatten()):
+        cmap = cmaps.get(i, None)
+        show_img(imgs[i], labels[i], ax, cmap=cmap)
 
-def view_imgs(imgs, labels, figsize, multi_col=True, sharex=True, sharey=True):
+def view_imgs(imgs, labels, figsize, multi_col=True, sharex=True, sharey=True, cmaps = {}):
     '''
     this function show images side by side
     :param imgs: 
@@ -31,9 +39,8 @@ def view_imgs(imgs, labels, figsize, multi_col=True, sharex=True, sharey=True):
     '''
     nrows = 1 if multi_col else len(labels)
     ncols = len(labels) if multi_col else 1
-    fig, axes = plt.subplots(figsize=figsize, nrows=nrows, ncols=ncols, sharey=sharex, sharex=sharey)
-    for i, ax in enumerate(axes.flatten()):
-        show_img(imgs[i], labels[i], ax)
+    grid_view(imgs, labels, figsize, nrows=nrows,ncols=ncols, sharex=sharex, sharey=sharey, cmaps=cmaps)
+
 
 def calibrate_camera(img_files, nx, ny):
     '''
@@ -77,6 +84,7 @@ def calibrate_camera(img_files, nx, ny):
         raise Exception('Calibrate camera FAILED, please check calib image files')
 
     return img_WH, mtx, dist, rvecs, tvecs
+
 
 
 def abs_sobel_thresh(img_channel, sobel_kernel=3, orient='x', thresh=(0, 255)):
@@ -141,6 +149,52 @@ def color_thresh(img_channel, thresh=(0, 255)):
     binary_output[(img_channel > thresh[0]) & (img_channel <= thresh[1])] = 1
     return binary_output
 
+def binary_threshold_v1(rgb_in, ksize=3):
+    '''
+    apply a combination of above threshold-functions to create a binary image from rgb-image
+    :param rgb_in: 
+    :param ksize: 
+    :return: 
+    '''
+    gray = cv2.cvtColor(rgb_in, cv2.COLOR_RGB2GRAY)
+    hls = cv2.cvtColor(rgb_in, cv2.COLOR_RGB2HLS)
+
+    gradx = abs_sobel_thresh(gray, orient='x', sobel_kernel=ksize, thresh=(20, 100))
+    grady = abs_sobel_thresh(gray, orient='y', sobel_kernel=ksize, thresh=(20, 100))
+    mag_binary = mag_thresh(gray, sobel_kernel=ksize, mag_thresh=(30, 100))
+    dir_binary = dir_thresh(gray, sobel_kernel=ksize, thresh=(0.7, 1.3))
+    color_bin_s = color_thresh(hls[:, :, 2], thresh=(150, 255))
+    color_bin_h = color_thresh(hls[:, :, 0], thresh=(15, 100))
+
+    combined = np.zeros_like(gray)
+    combined[((gradx == 1) & (grady == 1)) | \
+             ((mag_binary == 1) & (dir_binary == 1)) \
+             | (color_bin_s==1)] = 1
+    return combined
+
+def binary_threshold_v2(rgb_in, ksize=3):
+    '''
+    apply a combination of above threshold-functions to create a binary image from rgb-image
+    :param rgb_in: 
+    :param ksize: 
+    :return: 
+    '''
+    gray = cv2.cvtColor(rgb_in, cv2.COLOR_RGB2GRAY)
+    hls = cv2.cvtColor(rgb_in, cv2.COLOR_RGB2HLS)
+
+    gradx = abs_sobel_thresh(gray, orient='x', sobel_kernel=ksize, thresh=(20, 100))
+    grady = abs_sobel_thresh(gray, orient='y', sobel_kernel=ksize, thresh=(20, 100))
+    mag_binary = mag_thresh(gray, sobel_kernel=ksize, mag_thresh=(30, 100))
+    dir_binary = dir_thresh(gray, sobel_kernel=ksize, thresh=(0.7, 1.3))
+    color_bin_s = color_thresh(hls[:, :, 2], thresh=(150, 255))
+    color_bin_h = color_thresh(hls[:, :, 0], thresh=(15, 100))
+
+    combined = np.zeros_like(gray)
+    combined[((gradx == 1) & (grady == 1)) | \
+             ((mag_binary == 1) & (dir_binary == 1)) \
+             | ((color_bin_h == 1) & (color_bin_s==1))] = 1
+    return combined
+
 def binary_threshold(rgb_in, ksize=3):
     '''
     apply a combination of above threshold-functions to create a binary image from rgb-image
@@ -155,10 +209,13 @@ def binary_threshold(rgb_in, ksize=3):
     grady = abs_sobel_thresh(gray, orient='y', sobel_kernel=ksize, thresh=(20, 100))
     mag_binary = mag_thresh(gray, sobel_kernel=ksize, mag_thresh=(30, 100))
     dir_binary = dir_thresh(gray, sobel_kernel=ksize, thresh=(0.7, 1.3))
-    color_bin = color_thresh(hls[:, :, 2], thresh=(150, 255))
+    color_bin_s = color_thresh(hls[:, :, 2], thresh=(150, 255))
+    color_bin_h = color_thresh(hls[:, :, 0], thresh=(15, 100))
 
     combined = np.zeros_like(gray)
-    combined[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1)) | (color_bin == 1)] = 1
+    combined[((gradx == 1) & (grady == 1)) | \
+             ((mag_binary == 1) & (dir_binary == 1)) \
+             | ((color_bin_h == 1) & (color_bin_s==1))] = 1
     return combined
 
 src_points = np.float32([(205, 720), (595,450), (685,450), (1110,720)])
@@ -234,3 +291,25 @@ def measure_offset(img_H, img_W, lr_fits, xpix2m = 3.7/700):
 
     offset_pixel = orig_pts[0][0][0] - midpoint
     return offset_pixel * xpix2m
+
+def video2images(video_file, output_dir):
+    '''
+    This function converts video into frame images (jpg format)
+    It uses cv2.VideoCapture
+    :param video_file: a mp4 video
+    :param output_dir: where to save frame images
+    :return: 
+    '''
+    if not os.path.isfile(video_file):
+        raise Exception('Video file {} does NOT exist'.format(video_file))
+
+    clip = VideoFileClip(video_file)
+    frame_idx = 0
+    ts = time.time()
+    for frame in clip.iter_frames():
+        frame_idx += 1
+        mpimg.imsave('{}/frame_{:05d}.png'.format(output_dir, frame_idx), frame)
+    te = time.time()
+    print('{} frames are saved to {}, took {:.2f} seconds'.format(frame_idx, output_dir, te-ts))
+    return frame_idx
+

@@ -33,6 +33,17 @@ The goals / steps of this project are the following:
 [step4_lane_line_conv]: ./assets/step4_lane_line_conv.png "Step 4 Lane-line finding with convolution"
 
 [step6_draw_lane_line]: ./assets/step6_draw_lane_line.png "Step 6 Draw lane line"
+[step6_test_pipeline]: ./assets/step6_test_pipeline.png "Step 6 Test pipeline"
+
+[video_naive_failed]: ./assets/video_naive_failed.png "Failed frames 1"
+[video_naive_improved1]: ./assets/video_naive_improved1.png "Improved Binary threshold"
+[video_naive_failed2]: ./assets/video_naive_failed2.png "Failed frames 2"
+
+[frame1045_bin]: ./assets/frame1045_bin.png "Frame 1045 binary"
+[frame1045_bin_channel]: ./assets/frame1045_bin_channel.png "Frame 1045 binary in diffrent channel"
+[frame1045_lane_finding]: ./assets/frame1045_lane_finding.png "Frame 1045 lane finding"
+
+[frame587_bin]: ./assets/frame587_bin.png "Frame 587 binary"
 ## Rubric Points
 
 Here I will consider the [rubric points]((https://review.udacity.com/#!/rubrics/571/view)) individually and describe how I addressed each point in my implementation.  
@@ -179,13 +190,62 @@ Here is the output for above image:
 
 ![alt text][step6_draw_lane_line]
 
+We put all the above steps into `pipeline_single_image` in `pipeline.py`. The lane-line for all test images looks like
+
+![alt text][step6_test_pipeline]
+
+The pipeline works reasonably well on all test images. Now let's try it with `project_video.mp4`. 
+
 ---
 
 ### Pipeline (video)
 
-#### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
+#### 1. Naive approach
+We can try the `pipeline_single_image` on each frame of the clip, this is implemented in `pipeline_video_naive` in `pipeline.py`.
 
-Here's a [link to my video result](./project_video.mp4)
+The output is saved to `project_video_naive.mp4`. This approach works reasonably well except around the 42-nd second (or frame 1042 - 1051), it fails to detect lane-line as seen below
+
+![alt text][video_naive_failed]
+
+Let's look at frame-1045th
+
+![alt text][frame1045_bin]
+
+![alt text][frame1045_lane_finding]
+
+It's clear that the shadow make the lane-line finding failed to find the right lane-line.
+
+#### 2. Review binary threshold
+
+We review the color threshold of the frame 1045th and we find that
+
+![alt text][frame1045_bin_channel]
+
+It seems that if we combine both H and S color, it might improve the lane-line detector. And indeed, the result looks better
+
+![alt_text][video_naive_improved1]
+
+Looking at the video output, we find that at the 24-th second (or frame 585 - 595), it fails to detect the left-lane
+
+![alt_text][video_naive_failed2]
+
+The binary threshold of the frame 587th looks like
+
+![alt text][frame587_bin]
+
+It's clear that due to the constrast of the left wall, it makes the wall to appear in the binary image which causes the lane-line detection failed.
+
+#### 3. Look ahead-filter
+As suggested in the project page, we should keep track of the last few lane-line detection and do the following sanity check
+
+* checking that they have similar curvature
+* checking that they are separated by approximately the right distance horizontally
+* checking that they are roughly parallel
+
+Also, we can use the lane-line of the previous frame as a start point for the next frame, this will ensure a smooth transition of 
+lane-line detection and also help to filter out noisy result.
+
+
 
 ---
 

@@ -114,7 +114,7 @@ The technique we use to create a binary image is a combination of
  * direction threshold
  * color threshold using S-channel of HLS color-space
 
-The course has explained well the above technique so we don't repeat it here. The implementation is done in `utils.binary_threshold`.
+The course has explained well the above technique so we don't repeat it here. The implementation is done in `utils.binary_threshold_v1`.
 
 Here is the output of above undistorted image 
 
@@ -203,7 +203,7 @@ The pipeline works reasonably well on all test images. Now let's try it with `pr
 #### 1. Naive approach
 We can try the `pipeline_single_image` on each frame of the clip, this is implemented in `pipeline_video_naive` in `pipeline.py`.
 
-The output is saved to `project_video_naive.mp4`. This approach works reasonably well except around the 42-nd second (or frame 1042 - 1051), it fails to detect lane-line as seen below
+The output is saved to `project_video_naive_v1.mp4`. This approach works reasonably well except around the 42-nd second (or frame 1042 - 1051), it fails to detect lane-line as seen below
 
 ![alt text][video_naive_failed]
 
@@ -225,7 +225,7 @@ It seems that if we combine both H and S color, it might improve the lane-line d
 
 ![alt_text][video_naive_improved1]
 
-Looking at the video output, we find that at the 24-th second (or frame 585 - 595), it fails to detect the left-lane
+Looking at the video output `project_video_naive_v2.mp4`, we find that at the 24-th second (or frame 585 - 595), it fails to detect the left-lane
 
 ![alt_text][video_naive_failed2]
 
@@ -235,6 +235,13 @@ The binary threshold of the frame 587th looks like
 
 It's clear that due to the constrast of the left wall, it makes the wall to appear in the binary image which causes the lane-line detection failed.
 
+There are two ways to work around the above issue
+
+ * defining a fixed region of interest, this might work well on this track since we drive well in middle of the lane and the road is almost straight.
+ * noticing that in the above frames, it fails to detect lane-line in only 3 frames (587,588,589) but in other frames it works well. We can then use previous lane line as starter point to search for lane-line in current frame. This serves as dynamic region of interest which might work well for sharp curves and tricky condition.
+  
+We try to implement the second approach now.
+  
 #### 3. Look ahead-filter
 As suggested in the project page, we should keep track of the last few lane-line detection and do the following sanity check
 
@@ -245,7 +252,12 @@ As suggested in the project page, we should keep track of the last few lane-line
 Also, we can use the lane-line of the previous frame as a start point for the next frame, this will ensure a smooth transition of 
 lane-line detection and also help to filter out noisy result.
 
+The implementation is done in
+* class `lane_line.LaneLine` to allow us to keep track of previous fitted parameters
+* function `pipeline.pipeline_img_with_memory` which detects lane-line for a frame using fitted information from previous frame
+* function `pipeline.pipeline_video_look_ahead` which detects lane-line for each frame in a video
 
+The result is saved to `project_video_look_ahead.mp4`
 
 ---
 

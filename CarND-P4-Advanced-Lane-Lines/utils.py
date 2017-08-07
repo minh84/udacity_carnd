@@ -195,29 +195,6 @@ def binary_threshold_v2(rgb_in, ksize=3):
              | ((color_bin_h == 1) & (color_bin_s==1))] = 1
     return combined
 
-def binary_threshold(rgb_in, ksize=3):
-    '''
-    apply a combination of above threshold-functions to create a binary image from rgb-image
-    :param rgb_in: 
-    :param ksize: 
-    :return: 
-    '''
-    gray = cv2.cvtColor(rgb_in, cv2.COLOR_RGB2GRAY)
-    hls = cv2.cvtColor(rgb_in, cv2.COLOR_RGB2HLS)
-
-    gradx = abs_sobel_thresh(gray, orient='x', sobel_kernel=ksize, thresh=(20, 100))
-    grady = abs_sobel_thresh(gray, orient='y', sobel_kernel=ksize, thresh=(20, 100))
-    mag_binary = mag_thresh(gray, sobel_kernel=ksize, mag_thresh=(30, 100))
-    dir_binary = dir_thresh(gray, sobel_kernel=ksize, thresh=(0.7, 1.3))
-    color_bin_s = color_thresh(hls[:, :, 2], thresh=(150, 255))
-    color_bin_h = color_thresh(hls[:, :, 0], thresh=(15, 100))
-
-    combined = np.zeros_like(gray)
-    combined[((gradx == 1) & (grady == 1)) | \
-             ((mag_binary == 1) & (dir_binary == 1)) \
-             | ((color_bin_h == 1) & (color_bin_s==1))] = 1
-    return combined
-
 src_points = np.float32([(205, 720), (595,450), (685,450), (1110,720)])
 dst_points = np.float32([(300, 720), (300, 0),  (950, 0),  (950, 720)])
 P_M = cv2.getPerspectiveTransform(src_points, dst_points)
@@ -241,7 +218,7 @@ def warper_inv(img_in):
     H, W = img_in.shape[:2]
     return cv2.warpPerspective(img_in, P_Minv, (W, H), flags=cv2.INTER_LINEAR)
 
-def curvature_radius(yval, A, B, quad_eps=1e-5):
+def curvature_radius(yval, A, B, quad_eps=1e-4):
     return ((1.0 + (2.0*A*yval + B)**2)**1.5) / (2.0 * max(quad_eps, np.abs(A)))
 
 def measure_curvature(img_H, lr_fits, ypix2m = 30./720, xpix2m=3.7/700):

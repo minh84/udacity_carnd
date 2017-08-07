@@ -1,7 +1,9 @@
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-from utils import warper_inv, measure_curvature, measure_offset
+from collections import deque
+
+from utils import warper_inv, measure_curvature, measure_offset, curvature_radius
 
 def find_lane_line_hist(binary_warped, nwindows, margin=100, minpix=50, debug=False):
     '''
@@ -269,8 +271,14 @@ def visualize_lane_line(binary_warped,
     if title is not None:
         ax.set_title(title, fontsize=20)
 
-
 def draw_lane_area(in_img, binary_warped, left_right_fits):
+    '''
+    This function draw lane-line on road image
+    :param in_img: 
+    :param binary_warped: 
+    :param left_right_fits: 
+    :return: 
+    '''
     img_H, img_W = binary_warped.shape
 
     # left/right lane-lines
@@ -294,28 +302,211 @@ def draw_lane_area(in_img, binary_warped, left_right_fits):
     # Warp the blank back to original image space using inverse perspective matrix (Minv)
     newwarp = warper_inv(color_warp)
 
-    # Compute the curvature-radius & car position
-    l_radius, r_radius = measure_curvature(img_H, left_right_fits)
-    pos_offset = measure_offset(img_H, img_W, left_right_fits)
-    radius = (int)((l_radius+r_radius)/2)
+    # Combine the result with the original image
+    return cv2.addWeighted(in_img, 1, newwarp, 0.3, 0)
 
-    if (pos_offset > 1e-2):
+def draw_curvrad_carpos(img, radius, clane_base_pos):
+    '''
+    This function draws measuring information on road image
+    :param img: 
+    :param radius: 
+    :param clane_base_pos: 
+    :return: 
+    '''
+
+    if (clane_base_pos > 1e-2):
         left_or_right = ' right '
-    elif (pos_offset < -1e-2):
+    elif (clane_base_pos < -1e-2):
         left_or_right = ' left '
     else:
         left_or_right = ' '
 
-    # Combine the result with the original image
-    img = cv2.addWeighted(in_img, 1, newwarp, 0.3, 0)
     cv2.putText(img,
                 'Radius of Curvature = {:5d}(m)'.format(radius),
                 (30, 30), cv2.FONT_HERSHEY_COMPLEX,
                 1.0, (255, 255, 255), 2, cv2.LINE_AA)
 
     cv2.putText(img,
-                'Vehical is of {:.2f}m{}of center'.format(np.abs(pos_offset), left_or_right),
+                'Vehical is of {:.2f}m{}of center'.format(np.abs(clane_base_pos), left_or_right),
                 (30, 80), cv2.FONT_HERSHEY_COMPLEX,
                 1.0, (255, 255, 255), 2, cv2.LINE_AA)
 
     return img
+
+
+class LaneLine(object):
+    '''
+    We implement LaneLine object so that we can 
+        1)  keep track of things like last several:    
+                lane-line detection
+                curvature was
+        2) apply smoothing on lane-line detection by moving-average
+        3) do sanity check: 
+                lane-lines are roughly parallel (separated by approximately the right distance horizontally)
+                check if curvature is similar
+    '''
+
+    def __init__(self,
+                 left_or_right='left',
+                 n_last=5,
+                 margin=100,
+                 minpix=50,
+                 nwindows=9,
+                 img_WH=(1280,720),
+                 xpix2m=3.7/700,
+                 ypix2m=30.0/720):
+
+        # x = A*y^2 + B*y + C, we keep track of n last fitted coefficient
+        self._fitA = deque(maxlen=n_last)
+        self._fitB = deque(maxlen=n_last)
+        self._fitC = deque(maxlen=n_last)
+
+        # store search parameter
+        self._margin   = margin
+        self._minpix   = minpix
+        self._nwindows = nwindows
+        self._img_WH   = img_WH
+
+        # parameter to convert pixel to meter
+        self._xpix2m = xpix2m
+        self._ypix2m = ypix2m
+
+        # is left lane or right lane (need this for blind search)
+        self._left_or_right = left_or_right
+
+        # average coefficients
+        self._avgFit = None
+
+        # radius of curvature
+        self._radius_of_curvature = None
+
+        # distance in meters of vehicle center from the line
+        self._line_base_pos = None
+
+    def window_search(self,
+                     binary_warped,
+                     nonzerox,
+                     nonzeroy):
+
+        H, W = binary_warped.shape
+        half_H = H // 2
+        half_W = W // 2
+
+        # histogram of the half-bottom
+        if self._left_or_right == 'left':
+            half_bottom_hist = np.sum(binary_warped[half_H:, :half_W], axis=0)
+            x_pos = np.argmax(half_bottom_hist)
+        else:
+            half_bottom_hist = np.sum(binary_warped[half_H:, half_W:], axis=0)
+            x_pos = np.argmax(half_bottom_hist) + half_W
+
+        # taking the peak as starting points
+
+        # height of sliding window
+        window_H = H // self._nwindows
+
+        # sliding window histogram search
+        lane_idx = []
+
+        for iw in range(self._nwindows):
+            # identify window boundaries
+            win_y_low = H - (iw + 1) * window_H
+            win_y_high = H - iw * window_H
+
+            win_x_low  = x_pos - self._margin
+            win_x_high = x_pos + self._margin
+
+
+            # identify the nonzero pixels in x and y within the window (stored as index)
+            nonzero_win = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & \
+                           (nonzerox >= win_x_low) & (nonzerox < win_x_high)).nonzero()[0]
+
+            # append these indices to the lists
+            lane_idx.append(nonzero_win)
+
+            # re-adjust the position when you found enough pixels in a window
+            if len(nonzero_win) > self._minpix:
+                x_pos = np.int(np.mean(nonzerox[nonzero_win]))
+
+        # concatenate found points
+        lane_idx = np.concatenate(lane_idx)
+
+        # extract points of interest
+        x = nonzerox[lane_idx]
+        y = nonzeroy[lane_idx]
+
+        # finally fit a second order polynomial to each: note that we fit x = quadratic(y)
+        fit = np.polyfit(y, x, 2)
+
+        # return fitted polynomial
+        return fit
+
+    def average_search(self,
+                       nonzerox,
+                       nonzeroy):
+        if self._avgFit is None:
+            raise Exception('Expect average fit coefficient, found None')
+
+        # define region of interest using previous average fits
+        nonzero_curve = self._avgFit[0] * (nonzeroy**2) + self._avgFit[1] * nonzeroy + self._avgFit[2]
+        lane_idx = ((nonzerox > nonzero_curve - self._margin) & (nonzerox < nonzero_curve + self._margin))
+
+        if len(lane_idx) > 30:
+            # extract points of interest
+            x = nonzerox[lane_idx]
+            y = nonzeroy[lane_idx]
+
+            # finally fit a second order polynomial to each: note that we fit x = quadratic(y)
+            fit = np.polyfit(y, x, 2)
+
+            # return fitted polynomial
+            return True, fit
+        else:
+            return False, None
+
+    def update_fit(self, new_fit):
+        # update parameters
+        self._fitA.append(new_fit[0])
+        self._fitB.append(new_fit[1])
+        self._fitC.append(new_fit[2])
+        self._avgFit[0] = np.mean(self._fitA)
+        self._avgFit[1] = np.mean(self._fitB)
+        self._avgFit[2] = np.mean(self._fitC)
+
+    def get_measure(self, fit):
+        # now we know the fit parameter we will compute
+        #       lane-curvature & position of the car
+        A_in_m = self._xpix2m * fit[0] / (self._ypix2m ** 2)
+        B_in_m = self._xpix2m * fit[1] / self._ypix2m
+        yval = self._img_WH[1]
+        radius_of_curvature = curvature_radius(yval * self._ypix2m, A_in_m, B_in_m)
+
+        # compute position of the car
+        xval = fit[0] * (yval ** 2) + fit[1] * yval + fit[2]
+        pts = np.array([[[xval, yval]]], dtype=np.float64)
+        orig_pts = warper_inv(pts)
+
+        offset_pixel = orig_pts[0][0][0] - self._img_WH[0] / 2
+        line_base_pos = offset_pixel * self._xpix2m
+
+        return  radius_of_curvature, line_base_pos
+
+    def search(self, binary_warped, nonzerox, nonzeroy):
+        if self._avgFit is None:
+            fit = self.window_search(binary_warped, nonzerox, nonzeroy)
+
+            self._avgFit = fit
+            self._fitA.append(fit[0])
+            self._fitB.append(fit[1])
+            self._fitC.append(fit[2])
+        else:
+            ret, fit = self.average_search(nonzerox, nonzeroy)
+            # if not succesfull, switch back to blind-search
+            if not ret:
+                fit = self.window_search(binary_warped, nonzerox, nonzeroy)
+
+            self.update_fit(fit)
+
+        self._radius_of_curvature, self._line_base_pos = self.get_measure(fit)
+
+        return fit

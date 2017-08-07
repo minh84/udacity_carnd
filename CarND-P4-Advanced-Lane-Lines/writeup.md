@@ -194,7 +194,7 @@ We put all the above steps into `pipeline_single_image` in `pipeline.py`. The la
 
 ![alt text][step6_test_pipeline]
 
-The pipeline works reasonably well on all test images. Now let's try it with `project_video.mp4`. 
+The pipeline works reasonably well on all test images (we also saved output images into `output_images`). Now let's try it with `project_video.mp4`. 
 
 ---
 
@@ -257,12 +257,29 @@ The implementation is done in
 * function `pipeline.pipeline_img_with_memory` which detects lane-line for a frame using fitted information from previous frame
 * function `pipeline.pipeline_video_look_ahead` which detects lane-line for each frame in a video
 
-The result is saved to `project_video_look_ahead.mp4`
+The result is saved to `project_video_look_ahead.mp4`, we can see that the lane-line is well detected through out the clip.
 
 ---
 
 ### Discussion
 
-#### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
+Working on this project, we have learnt to use
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+ * camera calibration
+ * gradient & color threshold
+ * perspective transform
+ * lane-line finding with sliding window search
+ * look ahead-filter (kind of Kalman filter) where we use previous fitted information on current frame
+
+The approach works well on `project_video.mp4` but fails on `challenge_video.mp4`. The difficulty in `challenge_video.mp4` is
+ 
+ * road image has two part with different color
+ * the lane seems smaller than the one in previous video
+ 
+One can use the following steps to improve the lane-line detection
+ 
+ * apply sanity check
+ * search for start point from center of image and go to left or right direction
+ * apply some heuristic of the road i.e left and right lane should has almost constant distance
+ 
+We certainly try to experiment with the above when we have more time.

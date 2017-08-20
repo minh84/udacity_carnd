@@ -84,14 +84,14 @@ def pipeline_imgs(imgs, windows, clf, bboxes_setting, **kwargs):
         hm = np.zeros(img_shape, dtype=np.float32)
         add_heat(hm, car_windows)
         hm = np.clip(hm, 0, 255)
-        out_imgs += [draw_boxes(img, car_windows, color=(0.0,0.0,1.0)), hm]
+        out_imgs += [draw_boxes(img, car_windows, color=(0.0,0.0,1.0), thick=3), hm]
         cmaps += [None, 'hot']
         out_labels += ['frame {}'.format(i), 'heat-map frame {}'.format(i)]
 
         # update new bounding boxes
         bboxes.append(car_windows)
 
-    out_imgs += [draw_boxes(imgs[-1], bboxes.get_bboxes()), bboxes.get_heatmap()]
+    out_imgs += [draw_boxes(imgs[-1], bboxes.get_bboxes(), thick=3), bboxes.get_heatmap()]
     cmaps += [None, 'hot']
     out_labels += ['last frame', 'heat-map last frame']
     return out_imgs, out_labels, cmaps

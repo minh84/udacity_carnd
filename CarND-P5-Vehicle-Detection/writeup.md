@@ -45,6 +45,7 @@ The goals / steps of this project are the following:
 
 [heat_map_bbox]: ./assets/heat_map_bbox.png
 [heat_map_filtering]: ./assets/heat_map_filtering.png
+[heat_map_filtering_finalframe]: ./assets/heat_map_filtering_finalframe.png
 
 [image1]: ./examples/car_not_car.png
 [image2]: ./examples/HOG_example.jpg
@@ -268,9 +269,9 @@ The parameters for above sliding windows is
 ```python
 scales        = [64, 96, 128, 160]
 x_start_stops = [[412, None],   [None,   None], [None, None], [None, None]]
-y_start_stops = [[400, 500]  ,  [400,  550],  [400,  600],  [400, 650]]
-x_overlaps    =  [0.75, 0.75, 0.75, 0.75]
-y_overlaps    =  [0.75, 0.5, 0.5, 0.5]
+y_start_stops = [[400, 500]  ,  [400,  550],  [400,  600],  [400, 640]]
+x_overlaps    = [0.75, 0.75, 0.75, 0.5]
+y_overlaps    = [0.70, 0.5,  0.5,  0.75]
 ```
 
 #### 2. Run classifier on search-windows
@@ -320,7 +321,7 @@ We notice
 * if `max_frames` is too high it might produce more false positive
 * if `threshold` is too high/low it might produce more false negative/positive 
 
-The final parameter is `max_frames=3, threshold=9`
+The final parameter is `max_frames=6, threshold=10`
 ####1. Final Video
 The pipeline is implemented in `pipeline.pipeline_video_memory`, the final video is saved down to `project_video_out.mp4`. 
 
@@ -332,21 +333,35 @@ to identify vehicle positions. I then used `scipy.ndimage.measurements.label()` 
 
 Here's an example result showing the heatmap from a series of frames of video, the result of `scipy.ndimage.measurements.label()` and the bounding boxes then overlaid on the last frame of video:
 
+##### Here is 6 frames and detected windows
 <center>
 
 ![alt text][heat_map_filtering]
 
 </center>
 
+##### And the heat-map filtering for the final frame
+
+<center>
+
+![alt text][heat_map_filtering_finalframe]
+
+</center>
+
 ---
 
 ##Conclusion
+Go through this project we have learnt
+
+* how to build vehicle classifier using classical features such as HOG, color-histogram or binning-spatial
+* how to use multi-scale sliding-windows to detect vehicles in image
+* how to use heat-map to filter false positive and multiple detection
 
 The pipeline works reasonably well, however we find the following limitation in our approach
 
-* our classifier is overfitting and has bias to black car (there are more black car samples)
+* our classifier is overfitting and has bias to black car (there are more black car samples): this can be solved by adding additional data
 * sliding windows are fixed and might not optimal
-* the pipeline is very slow (it took 1.3s/frame on my PC)
+* the pipeline is very slow (it took ~ 1.2s/frame on my PC) and it doesn't havest GPU power.
 * the vehicle is only detected after it appears enough in the image (only a part of the car is not recognized)
 
 Regarding speed, one could improve by computing the HOG feature to the whole region of interest then interpolate, due to 

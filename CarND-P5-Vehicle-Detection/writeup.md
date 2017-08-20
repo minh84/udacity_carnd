@@ -357,7 +357,7 @@ Go through this project we have learnt
 * how to use multi-scale sliding-windows to detect vehicles in image
 * how to use heat-map to filter false positive and multiple detection
 
-The pipeline works reasonably well, however we find the following limitation in our approach
+The pipeline works reasonably well, and we understand better Computer Vision technique. However we find the following limitation in our approach
 
 * our classifier is overfitting and has bias to black car (there are more black car samples): this can be solved by adding additional data
 * sliding windows are fixed and might not optimal

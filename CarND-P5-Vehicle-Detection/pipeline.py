@@ -3,7 +3,7 @@ from collections import deque
 from moviepy.editor import VideoFileClip
 from scipy.ndimage.measurements import label
 
-from lesson_utils import search_windows, heat_map_bbox, draw_boxes
+from lesson_utils import search_windows, add_heat, heat_map_bbox, draw_boxes
 
 def pipeline_single_img(img, windows, clf, **kwargs):
     car_windows = search_windows(img, windows, clf, **kwargs)
@@ -28,7 +28,7 @@ class BoundingBoxes(object):
     def append(self, bboxes):
         self._frame_bboxes.append(bboxes)
 
-    def get_bboxes(self):
+    def get_heatmap(self):
         heatmap = np.zeros(self._img_shape, dtype=np.float32)
         for frame_bboxes in self._frame_bboxes:
             # Add += 1 for all pixels inside each bbox
@@ -41,6 +41,10 @@ class BoundingBoxes(object):
 
         # Visualize the heatmap when displaying
         heatmap = np.clip(heatmap, 0, 255)
+        return heatmap
+
+    def get_bboxes(self):
+        heatmap = self.get_heatmap()
 
         # Find final boxes from heatmap using label function
         labels = label(heatmap)
@@ -68,9 +72,42 @@ def pipeline_single_img_memory(img, bboxes, windows, clf, **kwargs):
 
     return draw_boxes(img, car_hm_bboxes)
 
-def pipeline_video_memory(video_file, out_file, bboxes_obj, windows, clf, **kwargs):
-    clip = VideoFileClip(video_file)
-    process_image = lambda raw_rgb: pipeline_single_img_memory(raw_rgb, bboxes_obj, windows, clf, **kwargs)
+def pipeline_imgs(imgs, windows, clf, bboxes_setting, **kwargs):
+    img_shape, max_frames, threshold = bboxes_setting
+    bboxes = BoundingBoxes(img_shape, max_frames=max_frames, threshold=threshold)
+
+    out_imgs = []
+    cmaps    = []
+    out_labels = []
+    for i,img in enumerate(imgs):
+        car_windows = search_windows(img, windows, clf, **kwargs)
+        hm = np.zeros(img_shape, dtype=np.float32)
+        add_heat(hm, car_windows)
+        hm = np.clip(hm, 0, 255)
+        out_imgs += [draw_boxes(img, car_windows, color=(0.0,0.0,1.0)), hm]
+        cmaps += [None, 'hot']
+        out_labels += ['frame {}'.format(i), 'heat-map frame {}'.format(i)]
+
+        # update new bounding boxes
+        bboxes.append(car_windows)
+
+    out_imgs += [draw_boxes(imgs[-1], bboxes.get_bboxes()), bboxes.get_heatmap()]
+    cmaps += [None, 'hot']
+    out_labels += ['last frame', 'heat-map last frame']
+    return out_imgs, out_labels, cmaps
+
+
+def pipeline_video_memory(video, out_file, windows, clf, bboxes_setting, **kwargs):
+    if isinstance(video, str):
+        clip = VideoFileClip(video)
+    elif isinstance(video, VideoFileClip):
+        clip = video
+
+
+    img_shape, max_frames, threshold  = bboxes_setting
+    bboxes = BoundingBoxes(img_shape, max_frames=max_frames, threshold=threshold)
+
+    process_image = lambda raw_rgb: pipeline_single_img_memory(raw_rgb, bboxes, windows, clf, **kwargs)
     clip_lane_line = clip.fl_image(process_image)
 
     clip_lane_line.write_videofile(out_file, audio=False)

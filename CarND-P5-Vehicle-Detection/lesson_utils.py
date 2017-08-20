@@ -4,8 +4,7 @@ import cv2
 from skimage.feature import hog
 from scipy.ndimage.measurements import label
 import time
-import os
-
+import copy
 
 # Define a function to return HOG features and visualization
 def get_hog(img, **kwargs):
@@ -33,12 +32,13 @@ def get_hog(img, **kwargs):
         hog_imgs  = []
         for hog_c in range(3):
             output = hog(img[:,:, hog_c],
-                        block_norm='L2-Hys',
+                        block_norm='L1-sqrt',
                         orientations=orient,
                         pixels_per_cell=(pix_per_cell, pix_per_cell),
                         cells_per_block=(cell_per_block, cell_per_block),
                         transform_sqrt=True,
-                        visualise=vis, feature_vector=feature_vec)
+                        visualise=vis,
+                        feature_vector=feature_vec)
             if vis:
                 hog_feats.extend(output[0])
                 hog_imgs.extend(output[1])
@@ -51,21 +51,29 @@ def get_hog(img, **kwargs):
             return hog_feats
     else:
         return  hog(img[:,:, hog_channel],
-                block_norm='L1',
+                block_norm='L1-sqrt',
                 orientations=orient,
                 pixels_per_cell=(pix_per_cell, pix_per_cell),
                 cells_per_block=(cell_per_block, cell_per_block),
                 transform_sqrt=True,
                 visualise=vis, feature_vector=feature_vec)
 
+name2cspace = {'HSV': cv2.COLOR_RGB2HSV,
+               'LUV': cv2.COLOR_RGB2LUV,
+               'HLS': cv2.COLOR_RGB2HLS,
+               'YUV': cv2.COLOR_RGB2YUV,
+               'YCrCb': cv2.COLOR_RGB2YCrCb}
+
+# default hog-channel is 0 exception for HSV/HLS
+cspace2chog = {'HSV': 2,
+               'HLS': 1}
 
 # Define a function to compute binned color features
 def get_bin_spatial(img, **kwargs):
     spatial_size = kwargs.get('spatial_size', (32,32))
     # Use cv2.resize().ravel() to create the feature vector
-    features = cv2.resize(img, spatial_size).ravel()
     # Return the feature vector
-    return features
+    return cv2.resize(img, spatial_size).ravel()
 
 
 # Define a function to compute color histogram features
@@ -78,63 +86,77 @@ def get_color_hist(img, **kwargs):
     channel2_hist = np.histogram(img[:, :, 1], bins=nbins, range=bins_range)
     channel3_hist = np.histogram(img[:, :, 2], bins=nbins, range=bins_range)
     # Concatenate the histograms into a single feature vector
-    hist_features = np.concatenate((channel1_hist[0], channel2_hist[0], channel3_hist[0]))
+    hist_features = np.concatenate((channel1_hist[0], channel2_hist[0], channel3_hist[0])).astype(np.float32)
     # Return the individual histograms, bin_centers and feature vector
     return hist_features
 
-name2cspace = {'HSV'   : cv2.COLOR_RGB2HSV,
-               'LUV'   : cv2.COLOR_RGB2LUV,
-               'HLS'   : cv2.COLOR_RGB2HLS,
-               'YUV'   : cv2.COLOR_RGB2YUV,
-               'YCrCb' : cv2.COLOR_RGB2YCrCb}
+name2feats = {'bin_spatial': get_bin_spatial,
+              'color_hist': get_color_hist,
+              'hog': get_hog}
 
-name2feats = {'bin_spatial' : get_bin_spatial,
-              'color_hist'  : get_color_hist,
-              'hog'         : get_hog}
+def read_img(imgfn, color_space='RGB'):
+    img = mpimg.imread(imgfn)
+    if color_space != 'RGB':
+        img = cv2.cvtColor(img, name2cspace[color_space])
+    return img
+
+def scaled_img(img, color_space='RGB'):
+    if color_space == 'HSV' or color_space == 'HLS' or color_space == 'LUV':
+        img = np.copy(img)
+        if color_space == 'LUV':
+            img[:, : ,0] /= 100
+            img[:, :, 1] = (img[:, :, 1] + 134) / 354
+            img[:, :, 2] = (img[:, :, 2] + 140) / 362
+        else:
+            img[:, :, 0] /= 360
+
+    return img
+
+def convert_img(img, color_space='RGB', scaled=True):
+    if color_space != 'RGB':
+        img = cv2.cvtColor(img, name2cspace[color_space])
+
+    if scaled:
+        return scaled_img(img, color_space)
+    else:
+        return img
 
 def single_img_feature(img,
                        **kwargs):
     color_space = kwargs['color_space']
     feats = kwargs['feats']
+    scaled = kwargs['scaled']
 
     img_features = []
     # apply color conversion if other than 'RGB'
-    if color_space != 'RGB':
-        img = cv2.cvtColor(img, name2cspace[color_space])
+    img = convert_img(img, color_space, scaled)
 
     for feat in feats:
-        img_features.append(name2feats[feat](img, **kwargs))
+        img_features.append(name2feats[feat](img, **kwargs[feat]))
     return  np.concatenate(img_features)
 
 # Define a function to extract features from a list of images
 # Have this function call bin_spatial() and color_hist()
 def extract_features(imgs,
                      flags,
+                     combine_setting,
                      color_space='RGB',
                      feats = ['bin_spatial', 'color_hist', 'hog'],
-                     spatial_size=(32, 32),
-                     hist_bins=32,
-                     bins_range=(0.0, 1.0),
-                     orient=9,
-                     pix_per_cell=8,
-                     cell_per_block=2,
-                     hog_channel=0):
+                     scaled = True):
+    kwargs = copy.deepcopy(combine_setting)
+    kwargs['color_space'] = color_space
+    kwargs['feats']   = feats
+    kwargs['scaled'] = scaled
 
-    kwargs = {'color_space'     : color_space,
-              'feats'           : feats,
-              'spatial_size'    : spatial_size,
-              'hist_bins'       : hist_bins,
-              'bins_range'      : bins_range,
-              'orient'          : orient,
-              'pix_per_cell'    : pix_per_cell,
-              'cell_per_block'  : cell_per_block,
-              'hog_channel'     : hog_channel,
-              'vis'             : False,
-              'feature_vec'     : True}
+    # set default hog-channel if not exist
+    if 'hog' in kwargs:
+        if kwargs['hog'].get('hog_channel') is None:
+            kwargs['hog']['hog_channel'] = cspace2chog.get(color_space, 0)
 
     # Create a list to append feature vectors to
     features = []
     targets = []
+    ts = time.time()
     # Iterate through the list of images
     for file,flag in zip(imgs, flags):
         # read in each one by one
@@ -144,8 +166,9 @@ def extract_features(imgs,
         features.append(single_img_feature(flip_image, **kwargs))
         targets.extend([flag, flag])
 
+    print('Build feature {} cost {:.2f} second(s)'.format(feats, time.time() - ts))
     # Return list of feature vectors
-    return np.array(features), np.array(targets)
+    return np.array(features), np.array(targets), kwargs
 
 
 # Define a function that takes an image,
@@ -195,36 +218,18 @@ def slide_window(img_shape, x_start_stop=[None, None], y_start_stop=[None, None]
 
 
 # Define a function to draw bounding boxes
-def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
+def draw_boxes(img, bboxes, color=(0, 0, 255), thick=2, color_lastbox=False):
     # Make a copy of the image
     imcopy = np.copy(img)
     # Iterate through the bounding boxes
-    for bbox in bboxes:
+    for i, bbox in enumerate(bboxes):
         # Draw a rectangle given bbox coordinates
-        cv2.rectangle(imcopy, bbox[0], bbox[1], color, thick)
+        cv2.rectangle(imcopy, tuple(bbox[0]), tuple(bbox[1]), color, thick)
+
+    if color_lastbox:
+        cv2.rectangle(imcopy, tuple(bbox[0]), tuple(bbox[1]), (0,0,0), thickness=6)
     # Return the image copy with boxes drawn
     return imcopy
-
-def video2images(video_file, output_dir):
-    '''
-    This function converts video into frame images (jpg format)
-    It uses cv2.VideoCapture
-    :param video_file: a mp4 video
-    :param output_dir: where to save frame images
-    :return: 
-    '''
-    if not os.path.isfile(video_file):
-        raise Exception('Video file {} does NOT exist'.format(video_file))
-
-    clip = VideoFileClip(video_file)
-    frame_idx = 0
-    ts = time.time()
-    for frame in clip.iter_frames():
-        frame_idx += 1
-        mpimg.imsave('{}/frame_{:05d}.png'.format(output_dir, frame_idx), frame)
-    te = time.time()
-    print('{} frames are saved to {}, took {:.2f} seconds'.format(frame_idx, output_dir, te-ts))
-    return frame_idx
 
 def search_windows(img, windows, clf, **kwargs):
     if (img.dtype == np.uint8):
@@ -239,12 +244,17 @@ def search_windows(img, windows, clf, **kwargs):
             on_windows.append(window)
     return on_windows
 
-def heat_map_bbox(img, bboxes, threshold=3, debug=False):
-    heatmap = np.zeros_like(img, dtype=np.float32)
+def add_heat(heatmap, bboxes):
     for bbox in bboxes:
         # Add += 1 for all pixels inside each bbox
         # Assuming each "box" takes the form ((x1, y1), (x2, y2))
         heatmap[bbox[0][1]:bbox[1][1], bbox[0][0]:bbox[1][0]] += 1
+
+def heat_map_bbox(img, bboxes, threshold=3, debug=False):
+    heatmap = np.zeros_like(img, dtype=np.float32)
+
+    # build heatmap
+    add_heat(heatmap, bboxes)
 
     # apply threshold
     heatmap[heatmap <= threshold] = 0

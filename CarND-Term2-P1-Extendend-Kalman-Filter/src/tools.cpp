@@ -26,7 +26,7 @@ VectorXd Tools::CalculateRMSE(const vector<VectorXd> &estimations,
   // RMSE error
   for (int i = 0; i < estimations.size(); ++i) {
     for (int j = 0; j < 4; ++j) {
-      float err = estimations[i][j] - ground_truth[i][j];
+      double err = estimations[i][j] - ground_truth[i][j];
       rmse[j] += err*err;
     }
   }
@@ -48,14 +48,14 @@ MatrixXd Tools::CalculateJacobian(const VectorXd& x_state) {
 
     We want to compute dpolar / dx_state
   */
-  const float eps = 1e-6;
+  const double eps = 1e-6;
 
   MatrixXd Hj(3, 4);
-  float rho2 = x_state[0]*x_state[0] + x_state[1]*x_state[1];  
+  double rho2 = x_state[0]*x_state[0] + x_state[1]*x_state[1];  
   if (rho2 > eps) {
-    float rho  = sqrt(rho2);
-    float rho3 = rho * rho2;
-    float cross = x_state[2]*x_state[1] - x_state[3]*x_state[0];
+    double rho  = sqrt(rho2);
+    double rho3 = rho * rho2;
+    double cross = x_state[2]*x_state[1] - x_state[3]*x_state[0];
 
     Hj << x_state[0]/rho,   x_state[1]/rho,  0, 0,
           -x_state[1]/rho2, x_state[0]/rho2, 0, 0,
@@ -65,15 +65,3 @@ MatrixXd Tools::CalculateJacobian(const VectorXd& x_state) {
   }
   return Hj;
 }
-
-// VectorXd Tools::Cartesian2Polar(const VectorXd& cartesian) {
-//   /**
-//    The input cartesian is a vector of (px, py, x, y)
-//   */
-//   float rho = sqrt(cartesian[0] * cartesian[0] + cartesian[1] * cartesian[1]);
-//   float phi = atan2(cartesian[1], cartesian[0]);
-//   float rhodot = (cartesian[0] * cartesian[2] + cartesian[1] * cartesian[3]) / rho;
-//   VectorXd polar(3);
-//   polar << rho, phi, rhodot;
-//   return polar;
-// }

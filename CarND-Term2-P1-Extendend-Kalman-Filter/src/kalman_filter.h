@@ -1,15 +1,15 @@
 #ifndef KALMAN_FILTER_H_
 #define KALMAN_FILTER_H_
 #include "Eigen/Dense"
+#include "measure_model.h"
+
+class FusionEKF;
 
 class KalmanFilter {
-  void UpdateStep(const Eigen::VectorXd& y);
-
-public:
-
+private:
   // state vector
   Eigen::VectorXd x_;
-
+  
   // state covariance matrix
   Eigen::MatrixXd P_;
 
@@ -18,13 +18,10 @@ public:
 
   // process covariance matrix
   Eigen::MatrixXd Q_;
+  
+  friend class FusionEKF; // so that we can modify F_ & Q_ since F_ & Q_ depend on dt (and this's given at FusionEKF)
 
-  // measurement matrix
-  Eigen::MatrixXd H_;
-
-  // measurement covariance matrix
-  Eigen::MatrixXd R_;
-
+public:
   /**
    * Constructor
    */
@@ -40,12 +37,12 @@ public:
    * @param x_in Initial state
    * @param P_in Initial state covariance
    * @param F_in Transition matrix
-   * @param H_in Measurement matrix
-   * @param R_in Measurement covariance matrix
    * @param Q_in Process covariance matrix
    */
-  void Init(Eigen::VectorXd &x_in, Eigen::MatrixXd &P_in, Eigen::MatrixXd &F_in,
-      Eigen::MatrixXd &H_in, Eigen::MatrixXd &R_in, Eigen::MatrixXd &Q_in);
+  void Init(const Eigen::VectorXd &x_in, 
+            const Eigen::MatrixXd &P_in, 
+            const Eigen::MatrixXd &F_in, 
+            const Eigen::MatrixXd &Q_in);
 
   /**
    * Prediction Predicts the state and the state covariance
@@ -55,17 +52,25 @@ public:
   void Predict();
 
   /**
-   * Updates the state by using standard Kalman Filter equations
+   * Updates the state for Extended Kalman Filter equations
    * @param z The measurement at k+1
+   * @param model The measure model z_k = h(x_k) + v_k
    */
-  void Update(const Eigen::VectorXd &z);
+  void Update(const Eigen::VectorXd &z, MeasureModel* model);
+  
+  /**
+   * Updates the state for Extended Kalman Filter equations using Iterative method
+   * @param z The measurement at k+1
+   * @param model The measure model z_k = h(x_k) + v_k
+   */
+   void UpdateIEKF(const Eigen::VectorXd &z, MeasureModel* model, int iter);
 
   /**
-   * Updates the state by using Extended Kalman Filter equations
-   * @param z The measurement at k+1
+   * Get current state
    */
-  void UpdateEKF(const Eigen::VectorXd &z);
-
+  const Eigen::VectorXd& State() const {
+    return x_;
+  }
 };
 
 #endif /* KALMAN_FILTER_H_ */

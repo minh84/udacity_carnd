@@ -110,18 +110,13 @@ int main()
 
     	  //Push the current estimated x,y positon from the Kalman filter's state vector
 
-    	  VectorXd estimate(4);
+    	  const VectorXd estimate = fusionEKF.ekf_.State();
 
-    	  double p_x = fusionEKF.ekf_.x_(0);
-    	  double p_y = fusionEKF.ekf_.x_(1);
-    	  double v1  = fusionEKF.ekf_.x_(2);
-    	  double v2 = fusionEKF.ekf_.x_(3);
+    	  double p_x = estimate(0);
+    	  double p_y = estimate(1);
+    	  double v1  = estimate(2);
+    	  double v2  = estimate(3);
 
-    	  estimate(0) = p_x;
-    	  estimate(1) = p_y;
-    	  estimate(2) = v1;
-    	  estimate(3) = v2;
-    	  
     	  estimations.push_back(estimate);
 
     	  VectorXd RMSE = tools.CalculateRMSE(estimations, ground_truth);

@@ -40,9 +40,9 @@ void KalmanFilter::Update(const VectorXd &z, MeasureModel* model) {
  
   const MatrixXd& H = model->jacobian(x_);
   MatrixXd Ht = H.transpose();
-
-  MatrixXd S  = H * P_ * Ht + model->getNoise();
-  MatrixXd K  = P_ * Ht * S.inverse();
+  MatrixXd PHt = P_ * Ht;
+  MatrixXd S  = H * PHt + model->getNoise();
+  MatrixXd K  = PHt * S.inverse();
 
   // update state & covar
   model->normalize(y); // e.g for Radar we want y[1] in range [-pi, pi]
@@ -59,9 +59,9 @@ void KalmanFilter::UpdateIEKF(const Eigen::VectorXd &z, MeasureModel* model, int
     
     H = model->jacobian(x_ki);
     MatrixXd Ht = H.transpose();
-    
-    MatrixXd S  = H * P_ * Ht + model->getNoise();
-    K  = P_ * Ht * S.inverse();
+    MatrixXd PHt = P_ * Ht;
+    MatrixXd S  = H * PHt + model->getNoise();
+    K  = PHt * S.inverse();
     VectorXd step = z - model->measure(x_ki) - H * (x_ - x_ki);
     model->normalize(step);
     x_ki = x_ + K * step;

@@ -51,6 +51,9 @@ UKF::UKF() {
 
   Hint: one or more values initialized above might be wildly off...
   */
+  n_x_   = 5;                   // state = (px, py, v, phi, phidot) to represent CTRV model
+  n_aug_ = n_x_ + 2;            // process noise is 2d-vector (noise_a, noise_yawdd)
+  Xsig_pred_ = MatrixXd(5, 15);
 }
 
 UKF::~UKF() {}

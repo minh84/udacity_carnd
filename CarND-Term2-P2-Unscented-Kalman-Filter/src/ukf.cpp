@@ -81,13 +81,13 @@ void UKF::ProcessMeasurement(const MeasurementPackage& meas_package) {
   Complete this function! Make sure you switch between lidar and radar
   measurements.
   */
-  if(!is_initialized_) {
+  double delta_t = (meas_package.timestamp_ - time_us_) / 1.0e6; 
+
+  if(!is_initialized_ || delta_t < 0.) {
     Init(meas_package);
 
     return;
   }
-
-  double delta_t = (meas_package.timestamp_ - time_us_) / 1.0e6;  
 
   Prediction(delta_t);
 
@@ -104,7 +104,7 @@ void UKF::ProcessMeasurement(const MeasurementPackage& meas_package) {
 void UKF::Init(const MeasurementPackage& meas_package) {
   // reset all variable 
   x_.fill(0);
-  P_ = MatrixXd::Identity(5, 5);
+  P_ = MatrixXd::Identity(n_x_, n_x_);
   Xsig_pred_.setZero();
 
   if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
@@ -122,6 +122,12 @@ void UKF::Init(const MeasurementPackage& meas_package) {
 
   is_initialized_ = true;
   time_us_ = meas_package.timestamp_;
+}
+
+void normalizeAngle(double& angle) {
+  //angle normalization
+  while (angle > M_PI) angle -= 2.*M_PI;
+  while (angle <-M_PI) angle += 2.*M_PI;
 }
 
 /**
@@ -210,8 +216,7 @@ void UKF::Prediction(double delta_t) {
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
     
     //angle normalization
-    while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
-    while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
+    normalizeAngle(x_diff(3));
 
     P_ += weights_(i) * x_diff * x_diff.transpose() ;
   }
@@ -314,8 +319,7 @@ void UKF::UpdateRadar(const MeasurementPackage& meas_package) {
     VectorXd z_diff   = Zsig.col(i) - z_pred;
     
     // we need to normalize angle to be between [-pi, pi]
-    while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
-    while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
+    normalizeAngle(z_diff(1));
 
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
 
@@ -335,8 +339,7 @@ void UKF::UpdateRadar(const MeasurementPackage& meas_package) {
   
   // compute and normalize residual
   VectorXd residual =(meas_package.raw_measurements_ - z_pred);  
-  while (residual(1)> M_PI) residual(1)-=2.*M_PI;
-  while (residual(1)<-M_PI) residual(1)+=2.*M_PI;
+  normalizeAngle(residual(1));
 
   // Update state & covariance
   x_ += K * residual;

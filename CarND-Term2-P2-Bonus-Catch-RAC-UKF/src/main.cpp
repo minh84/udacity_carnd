@@ -61,11 +61,11 @@ int main()
           
           MeasurementPackage meas_package_L;
           istringstream iss_L(lidar_measurment);
-    	  long long timestamp_L;
+          long long timestamp_L;
 
-    	  // reads first element from the current line
-    	  string sensor_type_L;
-    	  iss_L >> sensor_type_L;
+          // reads first element from the current line
+          string sensor_type_L;
+          iss_L >> sensor_type_L;
 
       	  // read measurements at this timestamp
       	  meas_package_L.sensor_type_ = MeasurementPackage::LASER;
@@ -77,18 +77,17 @@ int main()
           meas_package_L.raw_measurements_ << px, py;
           iss_L >> timestamp_L;
           meas_package_L.timestamp_ = timestamp_L;
-          
-    	  ukf.ProcessMeasurement(meas_package_L);
-		 
-    	  string radar_measurment = j[1]["radar_measurement"];
-          
+          double delta_t = (double)(meas_package_L.timestamp_ - ukf.time_us_) / 1.0e6; 
+          ukf.ProcessMeasurement(meas_package_L);
+          string radar_measurment = j[1]["radar_measurement"];
+            
           MeasurementPackage meas_package_R;
           istringstream iss_R(radar_measurment);
-    	  long long timestamp_R;
+    	    long long timestamp_R;
 
-    	  // reads first element from the current line
-    	  string sensor_type_R;
-    	  iss_R >> sensor_type_R;
+          // reads first element from the current line
+          string sensor_type_R;
+          iss_R >> sensor_type_R;
 
       	  // read measurements at this timestamp
       	  meas_package_R.sensor_type_ = MeasurementPackage::RADAR;
@@ -102,24 +101,32 @@ int main()
           meas_package_R.raw_measurements_ << ro,theta, ro_dot;
           iss_R >> timestamp_R;
           meas_package_R.timestamp_ = timestamp_R;
+    	    ukf.ProcessMeasurement(meas_package_R);
+
+          target_x = ukf.x_[0];
+          target_y = ukf.x_[1];
+
+          std::cout << "px=" << ukf.x_[0] << ", py=" << ukf.x_[1] << std::endl;
+          std::cout << "v=" << ukf.x_[2] << ", phi=" << ukf.x_[3] << ", phid=" << ukf.x_[4] << std::endl;
+          std::cout << "R=" << ukf.x_[2] * delta_t / (2.*M_PI) << std::endl;
+
+          double heading_to_target = atan2(target_y - hunter_y, target_x - hunter_x);
+          while (heading_to_target > M_PI) heading_to_target-=2.*M_PI; 
+          while (heading_to_target <-M_PI) heading_to_target+=2.*M_PI;
+          //turn towards the target
+          double heading_difference = heading_to_target - hunter_heading;
+          while (heading_difference > M_PI) heading_difference-=2.*M_PI; 
+          while (heading_difference <-M_PI) heading_difference+=2.*M_PI;
+
           
-    	  ukf.ProcessMeasurement(meas_package_R);
 
-	  target_x = ukf.x_[0];
-	  target_y = ukf.x_[1];
+          double distance_difference = sqrt((target_y - hunter_y)*(target_y - hunter_y) 
+                                            + (target_x - hunter_x)*(target_x - hunter_x));
 
-    	  double heading_to_target = atan2(target_y - hunter_y, target_x - hunter_x);
-    	  while (heading_to_target > M_PI) heading_to_target-=2.*M_PI; 
-    	  while (heading_to_target <-M_PI) heading_to_target+=2.*M_PI;
-    	  //turn towards the target
-    	  double heading_difference = heading_to_target - hunter_heading;
-    	  while (heading_difference > M_PI) heading_difference-=2.*M_PI; 
-    	  while (heading_difference <-M_PI) heading_difference+=2.*M_PI;
-
-    	  double distance_difference = sqrt((target_y - hunter_y)*(target_y - hunter_y) + (target_x - hunter_x)*(target_x - hunter_x));
+          std::cout << "turn=" << heading_difference << ", dist=" << distance_difference << "\n\n";
 
           json msgJson;
-          msgJson["turn"] = heading_difference;
+          msgJson["turn"] = heading_difference;//max(heading_difference, 0.02);
           msgJson["dist"] = distance_difference; 
           auto msg = "42[\"move_hunter\"," + msgJson.dump() + "]";
           // std::cout << msg << std::endl;
@@ -155,7 +162,7 @@ int main()
   });
 
   h.onDisconnection([&h](uWS::WebSocket<uWS::SERVER> ws, int code, char *message, size_t length) {
-    ws.close();
+    // ws.close();
     std::cout << "Disconnected" << std::endl;
   });
 

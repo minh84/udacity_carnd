@@ -130,19 +130,7 @@ void normalizeAngle(double& angle) {
   while (angle <-M_PI) angle += 2.*M_PI;
 }
 
-/**
- * Predicts sigma points, the state, and the state covariance matrix.
- * @param {double} delta_t the change in time (in seconds) between the last
- * measurement and this one.
- */
-void UKF::Prediction(double delta_t) {
-  /**
-  TODO:
-
-  Complete this function! Estimate the object's location. Modify the state
-  vector, x_. Predict sigma points, the state, and the state covariance matrix.
-  */
-
+void UKF::generateSigmaPoints(MatrixXd& Xsig_aug) const {
   // create augmented x
   VectorXd x_aug(n_aug_);
   x_aug.head(n_x_) = x_;
@@ -158,11 +146,17 @@ void UKF::Prediction(double delta_t) {
   double scale = sqrt(lambda_ + n_aug_);
 
   // generate sigma-points
-  MatrixXd Xsig_aug = MatrixXd(n_aug_, n_sig_);
+  Xsig_aug = MatrixXd(n_aug_, n_sig_);
   Xsig_aug.col(0) = x_aug;
   for (int i = 0; i < n_aug_; ++i) {
     Xsig_aug.col(i + 1)          = x_aug + scale * L.col(i);
     Xsig_aug.col(i + 1 + n_aug_) = x_aug - scale * L.col(i);
+  }
+}
+
+void UKF::predictSigmaPoints(MatrixXd& Xsig_pred, const MatrixXd& Xsig_aug,double delta_t) const {
+  if (! (Xsig_pred.rows() == n_x_ && Xsig_pred_.cols() == n_sig_)) {
+    Xsig_pred.resize(n_x_, n_sig_);
   }
 
   const double delta_t2 = delta_t * delta_t;
@@ -201,25 +195,61 @@ void UKF::Prediction(double delta_t) {
 
     
     //write predicted sigma point into right column
-    Xsig_pred_(0,i) = px;
-    Xsig_pred_(1,i) = py;
-    Xsig_pred_(2,i) = v;
-    Xsig_pred_(3,i) = yaw_p;
-    Xsig_pred_(4,i) = yawd;
+    Xsig_pred(0,i) = px;
+    Xsig_pred(1,i) = py;
+    Xsig_pred(2,i) = v;
+    Xsig_pred(3,i) = yaw_p;
+    Xsig_pred(4,i) = yawd;
   }
+}
+
+void UKF::predictState(const MatrixXd& Xsig_pred, VectorXd* x_pred, MatrixXd* P_pred) const {
+  if (x_pred) {
+    *x_pred = Xsig_pred * weights_;
+    if(P_pred) {
+      P_pred->fill(0.);
+      for (int i = 0; i < n_sig_; ++i) {
+        // state difference
+        VectorXd x_diff = Xsig_pred_.col(i) - x_;
+        
+        //angle normalization
+        normalizeAngle(x_diff(3));
+
+        (*P_pred) += weights_(i) * x_diff * x_diff.transpose() ;
+      }
+    }
+  }  
+}
+
+/**
+ * Predicts sigma points, the state, and the state covariance matrix.
+ * @param {double} delta_t the change in time (in seconds) between the last
+ * measurement and this one.
+ */
+void UKF::Prediction(double delta_t) {
+  /**
+  TODO:
+
+  Complete this function! Estimate the object's location. Modify the state
+  vector, x_. Predict sigma points, the state, and the state covariance matrix.
+  */
+  MatrixXd Xsig_aug;
+  generateSigmaPoints(Xsig_aug);  
+  
+  predictSigmaPoints(Xsig_pred_, Xsig_aug, delta_t);
 
   // now we can predict x_, P_ (i.e compute x_k|k-1, P_k|k-1)
-  x_ = Xsig_pred_ * weights_;
-  P_.fill(0.);
-  for (int i = 0; i < n_sig_; ++i) {
-    // state difference
-    VectorXd x_diff = Xsig_pred_.col(i) - x_;
-    
-    //angle normalization
-    normalizeAngle(x_diff(3));
+  predictState(Xsig_pred_, &x_, &P_);
+}
 
-    P_ += weights_(i) * x_diff * x_diff.transpose() ;
-  }
+void UKF::getPredictedState(VectorXd& x_pred, double delta_t) const {
+ 
+  MatrixXd Xsig_aug;
+  generateSigmaPoints(Xsig_aug);  
+  
+  MatrixXd Xsig_pred;
+  predictSigmaPoints(Xsig_pred, Xsig_aug, delta_t);
+  predictState(Xsig_pred, &x_pred, nullptr);
 }
 
 /**

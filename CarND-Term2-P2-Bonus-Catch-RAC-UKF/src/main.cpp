@@ -76,8 +76,7 @@ int main()
           iss_L >> py;
           meas_package_L.raw_measurements_ << px, py;
           iss_L >> timestamp_L;
-          meas_package_L.timestamp_ = timestamp_L;
-          double delta_t = (double)(meas_package_L.timestamp_ - ukf.time_us_) / 1.0e6; 
+          meas_package_L.timestamp_ = timestamp_L;          
           ukf.ProcessMeasurement(meas_package_L);
           string radar_measurment = j[1]["radar_measurement"];
             
@@ -106,27 +105,53 @@ int main()
           target_x = ukf.x_[0];
           target_y = ukf.x_[1];
 
-          std::cout << "px=" << ukf.x_[0] << ", py=" << ukf.x_[1] << std::endl;
-          std::cout << "v=" << ukf.x_[2] << ", phi=" << ukf.x_[3] << ", phid=" << ukf.x_[4] << std::endl;
-          std::cout << "R=" << ukf.x_[2] * delta_t / (2.*M_PI) << std::endl;
+          // std::cout << "px=" << ukf.x_[0] << ", py=" << ukf.x_[1] << std::endl;
+          // std::cout << "v=" << ukf.x_[2] << ", phi=" << ukf.x_[3] << ", phid=" << ukf.x_[4] << std::endl;
+          // std::cout << "R=" << ukf.x_[2] * delta_t / (2.*M_PI) << std::endl;
 
-          double heading_to_target = atan2(target_y - hunter_y, target_x - hunter_x);
-          while (heading_to_target > M_PI) heading_to_target-=2.*M_PI; 
-          while (heading_to_target <-M_PI) heading_to_target+=2.*M_PI;
-          //turn towards the target
-          double heading_difference = heading_to_target - hunter_heading;
-          while (heading_difference > M_PI) heading_difference-=2.*M_PI; 
-          while (heading_difference <-M_PI) heading_difference+=2.*M_PI;
+          double turn = 0.;
+          bool chaseOn = false;
+          // only started chasing when covariance is small enough i.e measurement is stable enough
+          if(ukf.P_.maxCoeff() < 0.1) {
+            double last_v = ukf.x_[2];
+            double dt = 0.1;
+            
+            while (dt < 5.0) {              
+              VectorXd x_pred;
+              ukf.getPredictedState(x_pred, dt);
 
+              double diff_x = x_pred[0] - hunter_x;
+              double diff_y = x_pred[1] - hunter_y;
+              if (sqrt(diff_x * diff_x + diff_y * diff_y) < dt * last_v) {
+                chaseOn = true;
+                //turn towards the target
+                turn = atan2(diff_y, diff_x) - hunter_heading;
+                while (turn > M_PI) turn-=2.*M_PI; 
+                while (turn <-M_PI) turn+=2.*M_PI;
+
+                break;
+              }
+
+              dt += 0.05;
+            }
+
+          } 
           
+          // failed to chase, go back to simple head to current position
+          if (!chaseOn){
+            //turn towards the target
+            turn = atan2(target_y - hunter_y, target_x - hunter_x) - hunter_heading;
+            while (turn > M_PI) turn-=2.*M_PI; 
+            while (turn <-M_PI) turn+=2.*M_PI;
+          }
 
           double distance_difference = sqrt((target_y - hunter_y)*(target_y - hunter_y) 
                                             + (target_x - hunter_x)*(target_x - hunter_x));
 
-          std::cout << "turn=" << heading_difference << ", dist=" << distance_difference << "\n\n";
+          // std::cout << "turn=" << heading_difference << ", dist=" << distance_difference << "\n\n";
 
           json msgJson;
-          msgJson["turn"] = heading_difference;//max(heading_difference, 0.02);
+          msgJson["turn"] = turn;
           msgJson["dist"] = distance_difference; 
           auto msg = "42[\"move_hunter\"," + msgJson.dump() + "]";
           // std::cout << msg << std::endl;

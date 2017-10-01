@@ -99,6 +99,13 @@ public:
   void Prediction(double delta_t);
 
   /**
+   * Compute predicted state given an elapsed-time
+   * @param x_pred will be updated inplace
+   * @param delta_t is the elapsed-time
+   */
+  void getPredictedState(VectorXd& x_pred, double delta_t) const;
+
+  /**
    * Updates the state and the state covariance matrix using a laser measurement
    * @param meas_package The measurement at k+1
    */
@@ -109,6 +116,29 @@ public:
    * @param meas_package The measurement at k+1
    */
   void UpdateRadar(const MeasurementPackage& meas_package);
+
+private:
+  /**
+   * generate sigma-points to Xsig_aug
+   * @param Xsig_aug is updated inplace
+   */  
+  void generateSigmaPoints(MatrixXd& Xsig_aug) const;
+
+  /**
+   * predict sigma-point i.e compute f(Xsig_k,i, nu_k) for all sigma-point Xsig_aug
+   * @param Xsig_pred is updated inplaced, we expect that Xsig_pred is already of correct size (n_x_, n_sig_)
+   * @param Xsig_aug is the sigma-points
+   * @param delta_t is a double of elapsed-time
+   */
+  void predictSigmaPoints(MatrixXd& Xsig_pred, const MatrixXd& Xsig_aug, double delta_t) const;
+
+  /**
+   * compute predicted state if required
+   * @param Xsig_pred: predicted Sigma-Points
+   * @param x_pred: if not nullptr will be updated as predicted state = Xsig_pred * weights_
+   * @param P_pred: if not nullptr will be updated as covariance
+   */
+  void predictState(const MatrixXd& Xsig_pred, VectorXd* x_pred, MatrixXd* P_pred) const;
 };
 
 #endif /* UKF_H */

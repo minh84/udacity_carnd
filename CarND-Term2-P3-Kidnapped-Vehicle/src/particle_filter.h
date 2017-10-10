@@ -35,14 +35,11 @@ class ParticleFilter {
 	
 	// Flag, if filter is initialized
 	bool is_initialized;
-	
+
+public:	
 	// Vector of weights of all particles
 	std::vector<double> weights;
-	
-	// random normal & generator
-	std::normal_distribution<double> normd;
-	std::default_random_engine       gen;
-public:
+
 	
 	// Set of current particles
 	std::vector<Particle> particles;
@@ -51,10 +48,7 @@ public:
 	// @param num_particles Number of particles
 	ParticleFilter() : 
 	    num_particles(0)
-	  , is_initialized(false)
-	  , normd(std::normal_distribution<double>(0., 1.0))
-	  , gen() {
-	  }
+	  , is_initialized(false) {}
 
 	// Destructor
 	~ParticleFilter() {}
@@ -65,10 +59,10 @@ public:
 	 * @param x Initial x position [m] (simulated estimate from GPS)
 	 * @param y Initial y position [m]
 	 * @param theta Initial orientation [rad]
-	 * @param stdev[] Array of dimension 3 [standard deviation of x [m], standard deviation of y [m]
+	 * @param stddev[] Array of dimension 3 [standard deviation of x [m], standard deviation of y [m]
 	 *   standard deviation of yaw [rad]]
 	 */
-	void init(double x, double y, double theta, double stdev[]);
+	void init(double x, double y, double theta, double stddev[]);
 
 	/**
 	 * prediction Predicts the state for the next time step

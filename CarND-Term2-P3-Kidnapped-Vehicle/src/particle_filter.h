@@ -10,6 +10,7 @@
 #define PARTICLE_FILTER_H_
 
 #include "helper_functions.h"
+#include <random>
 
 struct Particle {
 
@@ -38,6 +39,9 @@ class ParticleFilter {
 	// Vector of weights of all particles
 	std::vector<double> weights;
 	
+	// random normal & generator
+	std::normal_distribution<double> normd;
+	std::default_random_engine       gen;
 public:
 	
 	// Set of current particles
@@ -45,7 +49,11 @@ public:
 
 	// Constructor
 	// @param num_particles Number of particles
-	ParticleFilter() : num_particles(0), is_initialized(false) {}
+	ParticleFilter() : 
+	    num_particles(0)
+	  , is_initialized(false)
+	  , normd(std::normal_distribution<double>(0., 1.0)) {
+	  }
 
 	// Destructor
 	~ParticleFilter() {}
@@ -56,10 +64,10 @@ public:
 	 * @param x Initial x position [m] (simulated estimate from GPS)
 	 * @param y Initial y position [m]
 	 * @param theta Initial orientation [rad]
-	 * @param std[] Array of dimension 3 [standard deviation of x [m], standard deviation of y [m]
+	 * @param stdev[] Array of dimension 3 [standard deviation of x [m], standard deviation of y [m]
 	 *   standard deviation of yaw [rad]]
 	 */
-	void init(double x, double y, double theta, double std[]);
+	void init(double x, double y, double theta, double stdev[]);
 
 	/**
 	 * prediction Predicts the state for the next time step

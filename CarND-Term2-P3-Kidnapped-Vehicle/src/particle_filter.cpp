@@ -25,7 +25,7 @@ void ParticleFilter::init(double x, double y, double theta, double stddev[]) {
 	//   x, y, theta and their uncertainties from GPS) and all weights to 1. 
 	// Add random Gaussian noise to each particle.
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
-	num_particles = 1000;
+	num_particles = 100;
 	weights = vector<double>(num_particles, 1.0);
 	
 	std::normal_distribution<double> normx(0., stddev[0]);
@@ -156,7 +156,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
 	int nb_particles = particles.size();
-	double cst = 1.0/(2.0 * M_PI * std_landmark[0] * std_landmark[1]);
+	vector<double> log_weights(nb_particles, 0.0);
+	double cstLog = log(2.0 * M_PI * std_landmark[0] * std_landmark[1]);
 	for (int i = 0; i < nb_particles; ++i) {		
 		// get landmark in range
 		std::vector<LandmarkObs> predicted = landmarkInRange(sensor_range, particles[i], map_landmarks);
@@ -166,17 +167,18 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		// compute distance to nearest neighbor since we only need distance to compute Multi-Gaussian probability
 		std::vector<std::pair<double, double>> dist_to_nn = distanceToNearestNeighbor(predicted, obs_in_map_coor);
 
-		// compute weight
-		double prob = 1;	
+		// compute log-weight		
 		for (auto dist : dist_to_nn) {
 			double exponent = dist.first*dist.first  / (2.0*std_landmark[0]*std_landmark[0]) +
 													dist.second*dist.second / (2.0*std_landmark[1]*std_landmark[1]) ;
-			prob *= (cst * exp(-exponent));
+			log_weights[i] -= (cstLog + exponent);
 		}		
-		
-		// update weight
-		particles[i].weight = prob;
-		weights[i] = prob;
+	}
+
+	double mean_logw = std::accumulate(log_weights.begin(), log_weights.end(), 0.) / log_weights.size();
+	for (int i = 0; i < nb_particles; ++i) {
+		particles[i].weight = exp(max(-50.0, min(50.0,log_weights[i] - mean_logw)));
+		weights[i] = particles[i].weight;
 	}
 }
 

@@ -25,7 +25,7 @@ void ParticleFilter::init(double x, double y, double theta, double stddev[]) {
 	//   x, y, theta and their uncertainties from GPS) and all weights to 1. 
 	// Add random Gaussian noise to each particle.
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
-	num_particles = 100;
+	num_particles = 200;
 	weights = vector<double>(num_particles, 1.0);
 	
 	std::normal_distribution<double> normx(0., stddev[0]);
@@ -175,9 +175,13 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		}		
 	}
 
+	// make the weight in bound
+	const double MIN_EXP=-30.0;
+	const double MAX_EXP=60.0;
+
 	double mean_logw = std::accumulate(log_weights.begin(), log_weights.end(), 0.) / log_weights.size();
 	for (int i = 0; i < nb_particles; ++i) {
-		particles[i].weight = exp(max(-50.0, min(50.0,log_weights[i] - mean_logw)));
+		particles[i].weight = exp(max(MIN_EXP, min(MAX_EXP,log_weights[i] - mean_logw)));
 		weights[i] = particles[i].weight;
 	}
 }

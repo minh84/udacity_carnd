@@ -52,7 +52,8 @@ public:
 	ParticleFilter() : 
 	    num_particles(0)
 	  , is_initialized(false)
-	  , normd(std::normal_distribution<double>(0., 1.0)) {
+	  , normd(std::normal_distribution<double>(0., 1.0))
+	  , gen() {
 	  }
 
 	// Destructor

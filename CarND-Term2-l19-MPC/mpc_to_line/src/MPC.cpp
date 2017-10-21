@@ -63,7 +63,19 @@ class FG_eval {
     // Reference State Cost
     // TODO: Define the cost related the reference state and
     // any anything you think may be beneficial.
+    for(int t = 0; t < N; ++t) {
+      // sum-square cte
+      fg[0] += CppAD::pow(vars[cte_start+t], 2);
+
+      // sum-square epsi
+      fg[0] += CppAD::pow(vars[epsi_start+t], 2);
+
+      // sum-square difference between current speed and reference speed
+      fg[0] += CppAD::pow(vars[v_start+t] - ref_v, 2);
+    }
+
     
+
     //
     // Setup Constraints
     //

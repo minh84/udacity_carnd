@@ -7,13 +7,13 @@ cmake_minimum_required (VERSION 3.5)
 add_definitions(-std=c++11 -O3)
 
 set(CXX_FLAGS "-Wall")
-set(CMAKE_CXX_FLAGS "${CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS, "${CXX_FLAGS}")
 
-set(sources src/MPC.cpp src/main.cpp)
+set(sources src/poly_utils.cpp src/MPC.cpp src/main.cpp)
 
+include_directories(src/Eigen-3.3)
 include_directories(/usr/local/include)
 link_directories(/usr/local/lib)
-include_directories(src/Eigen-3.3)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 

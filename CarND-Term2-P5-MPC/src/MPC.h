@@ -7,6 +7,7 @@
 using namespace std;
 
 class MPC {
+
  public:
   MPC();
 
@@ -19,6 +20,12 @@ class MPC {
   // store predicted trajectory
   vector<double>  mpc_x;
   vector<double>  mpc_y;
+
+  // update previous actuators
+  void Update(const vector<double>& prev_acc);
+private:
+  double _prev_a;
+  double _prev_delta;  
 };
 
 #endif /* MPC_H */

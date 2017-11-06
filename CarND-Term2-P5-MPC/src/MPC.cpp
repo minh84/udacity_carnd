@@ -10,6 +10,7 @@ using namespace Utils;
 // TODO: Set the timestep length and duration
 size_t N = 25;
 double dt = 0.05;
+size_t latency_steps = 2;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -145,6 +146,8 @@ class FG_eval {
 MPC::MPC() 
   : mpc_x(vector<double>(N, 0.))
   , mpc_y(vector<double>(N, 0.))
+  , _prev_a(.1)
+  , _prev_delta(.0)
 {}
 
 MPC::~MPC() {}
@@ -200,6 +203,17 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   for (int i = a_start; i < n_vars; i++) {
     vars_lowerbound[i] = -1.0;
     vars_upperbound[i] = 1.0;
+  }
+
+  // to handle latency, the first few actuators are fixed from previous step
+  for(int i = delta_start; i < delta_start + latency_steps; ++i) {
+    vars_lowerbound[i] = _prev_delta;
+    vars_upperbound[i] = _prev_delta;
+  }
+
+  for(int i = a_start; i < a_start + latency_steps; ++i) {
+    vars_lowerbound[i] = _prev_a;
+    vars_upperbound[i] = _prev_a;
   }
 
   // Lower and upper limits for the constraints
@@ -273,5 +287,10 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     mpc_x[i] = solution.x[x_start+i];
     mpc_y[i] = solution.x[y_start+i];
   }
-  return {solution.x[delta_start],   solution.x[a_start]};
+  return {solution.x[delta_start + latency_steps],   solution.x[a_start + latency_steps]};
+}
+
+void MPC::Update(const vector<double>& prev_acc) {
+  _prev_delta = prev_acc[0];
+  _prev_a     = prev_acc[1];
 }

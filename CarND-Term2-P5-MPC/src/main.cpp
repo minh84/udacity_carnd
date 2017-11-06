@@ -84,13 +84,7 @@ int main() {
 
           Eigen::VectorXd state(6);
 
-          // to take into account of latency the state must be at t + latency_ms
-          state << 0, 
-                   0, 
-                   0, 
-                   v, 
-                   cte, 
-                   epsi;
+          state << 0, 0, 0, v, cte, epsi;
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -102,6 +96,9 @@ int main() {
 
           double steer_value    = acctuators[0];
           double throttle_value = acctuators[1];
+
+          // update previous acctuators (which is used for next step due to latency)
+          mpc.Update(acctuators);
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -143,7 +140,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(0));
+          this_thread::sleep_for(chrono::milliseconds(100));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {

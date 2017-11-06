@@ -24,7 +24,7 @@ double dt = 0.05;
 const double Lf = 2.67;
 
 // a reference speed
-double ref_v = 30;
+double ref_v = 20;
 
 // this is to store the index-offset for each variables
 // each variable has N values except for delta & actuator, 

@@ -45,10 +45,11 @@ int main() {
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     string sdata = string(data).substr(0, length);
-    cout << sdata << endl;
+    
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
       string s = hasData(sdata);
       if (s != "") {
+        cout << "js-data " << s << endl;
         auto j = json::parse(s);
         string event = j[0].get<string>();
         if (event == "telemetry") {
@@ -59,7 +60,7 @@ int main() {
           double py  = j[1]["y"];
           double psi = j[1]["psi"];
           double v   = j[1]["speed"];
-
+          
           /*
            * convert to local-car coordinate
            */
@@ -77,12 +78,19 @@ int main() {
           }
           auto coeffs = Utils::polyfit(xvals, yvals, 3);
           // compute cte, epsi
-          // note that in local-car coordinate we have (px,py, psi) -> (0, 0, 0)
+          // note that in local-car coordinate we have (px, py, psi) -> (0, 0, 0)
           double cte  = coeffs[1];         // polyeval(coeffs, px) - py         | px = py = 0  
           double epsi = -atan(coeffs[0]);  // psi - atan(polyeval'(coeffs, px)) | px = psi = 0 
 
           Eigen::VectorXd state(6);
-          state << 0, 0, 0, v, cte, epsi;
+
+          // to take into account of latency the state must be at t + latency_ms
+          state << 0, 
+                   0, 
+                   0, 
+                   v, 
+                   cte, 
+                   epsi;
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -98,7 +106,7 @@ int main() {
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = steer_value / deg2rad(25);
+          msgJson["steering_angle"] = steer_value / 0.436332;
           msgJson["throttle"]       = throttle_value;
 
           //Display the MPC predicted trajectory 
@@ -125,7 +133,7 @@ int main() {
 
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+          // std::cout << msg << std::endl;
           // Latency
           // The purpose is to mimic real driving conditions where
           // the car does actuate the commands instantly.
@@ -166,7 +174,7 @@ int main() {
 
   h.onDisconnection([&h](uWS::WebSocket<uWS::SERVER> ws, int code,
                          char *message, size_t length) {
-    ws.close();
+    // ws.close();
     std::cout << "Disconnected" << std::endl;
   });
 

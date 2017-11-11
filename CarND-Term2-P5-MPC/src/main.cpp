@@ -10,6 +10,8 @@
 #include "MPC.h"
 #include "poly_utils.h"
 
+#include "cxxopts.hpp"
+
 // for convenience
 using json = nlohmann::json;
 
@@ -33,11 +35,41 @@ string hasData(string s) {
   return "";
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  // load reference speed
+  double ref_v   = 70.0;
+  double lower_v = 40.0;
+  bool   verbose = false;
+  try {
+    cxxopts::Options options(argv[0], " - MPC");
+    options.positional_help("[-v VELOCITY]");
+    options.add_options()
+      ("v,verbose",    "A flag turn on/off debug", cxxopts::value<bool>(verbose))
+      ("s,speed",      "A reference speed MPH",    cxxopts::value<double>(), "Reference velocity")
+      ("l,lower_speed","A lower speed MPH",        cxxopts::value<double>(), "Lower velocity");
+
+    options.parse(argc, argv);
+
+    // if we want to overwrite reference speed
+    if (options.count("s")) {
+      ref_v = options["s"].as<double>();
+    }
+
+    if (options.count("l")) {
+      lower_v = options["l"].as<double>();
+    }
+  } catch (const cxxopts::OptionException& e) {
+    cout << "error parsing options: " << e.what() << endl;
+    exit(1);
+  }
+  // ensure lower_v < ref_v and < 50.
+  lower_v = min(50., min(lower_v, ref_v * 0.8));
+  cout << "MPC start with reference speed = " << ref_v << " and lower speed = " << lower_v << endl;
+
   uWS::Hub h;
 
   // MPC is initialized here!
-  MPC mpc;
+  MPC mpc(ref_v, lower_v, verbose);
 
   h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -49,7 +81,10 @@ int main() {
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
       string s = hasData(sdata);
       if (s != "") {
-        cout << "js-data " << s << endl;
+        if (mpc.IsVerbose()) {
+          cout << "js-data " << s << endl;
+        }
+
         auto j = json::parse(s);
         string event = j[0].get<string>();
         if (event == "telemetry") {
@@ -79,8 +114,8 @@ int main() {
           auto coeffs = Utils::polyfit(xvals, yvals, 3);
           // compute cte, epsi
           // note that in local-car coordinate we have (px, py, psi) -> (0, 0, 0)
-          double cte  = coeffs[1];         // polyeval(coeffs, px) - py         | px = py = 0  
-          double epsi = -atan(coeffs[0]);  // psi - atan(polyeval'(coeffs, px)) | px = psi = 0 
+          double cte  = coeffs[0];         // polyeval(coeffs, px) - py         | px = py = 0  
+          double epsi = -atan(coeffs[1]);  // psi - atan(polyeval'(coeffs, px)) | px = psi = 0 
 
           Eigen::VectorXd state(6);
 

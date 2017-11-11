@@ -4,11 +4,14 @@
 #include <cppad/ipopt/solve.hpp>
 #include "Eigen-3.3/Eigen/Core"
 
+#include "json.hpp"
+using json = nlohmann::json;
+
 using CppAD::AD;
 using namespace Utils;
 
 // TODO: Set the timestep length and duration
-size_t N = 25;
+size_t N  = 12;
 double dt = 0.05;
 size_t latency_steps = 2;
 
@@ -24,9 +27,6 @@ size_t latency_steps = 2;
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
 
-// a reference speed
-double ref_v = 20;
-
 // this is to store the index-offset for each variables
 // each variable has N values except for delta & actuator, 
 // we only have N-1 values (control input for each time-step)
@@ -40,10 +40,16 @@ size_t delta_start = epsi_start + N;
 size_t a_start = delta_start + N - 1;
 
 class FG_eval {
- public:
   // Fitted polynomial coefficients
-  Eigen::VectorXd coeffs;
-  FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
+  Eigen::VectorXd _coeffs;
+  double _ref_v;
+public:  
+  FG_eval(const Eigen::VectorXd& coeffs, 
+          const double ref_v) 
+          : _coeffs(coeffs)
+          , _ref_v(ref_v)
+  { 
+  }
 
   typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
   void operator()(ADvector& fg, const ADvector& vars) {
@@ -67,7 +73,7 @@ class FG_eval {
       fg[0] += CppAD::pow(vars[epsi_start+t], 2);
 
       // sum-square difference between current speed and reference speed
-      fg[0] += CppAD::pow(vars[v_start+t] - ref_v, 2);
+      fg[0] += CppAD::pow(vars[v_start+t] - _ref_v, 2);
     }
 
     // minimize the use of acctuators
@@ -77,10 +83,14 @@ class FG_eval {
     }
     
     // minimize the change of acctuators
+    const double delta_w = 500.;
     for(int t = 0; t < N - 2; ++t) {
-      fg[0] += CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+      fg[0] += delta_w * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
       fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
     }
+
+    // ensure the smooth transition from previous step
+    //fg[0] += 100 * CppAD::pow(vars[delta_start + latency_steps] - vars[delta_start + latency_steps-1], 2);
     
     // Initial constraints
     //
@@ -117,8 +127,8 @@ class FG_eval {
       AD<double> a0     = vars[a_start + t - 1];
 
       // reference line & heading
-      AD<double> f0      = polyeval(coeffs, x0);
-      AD<double> psides0 = CppAD::atan(polydiff(coeffs, x0)); 
+      AD<double> f0      = polyeval(_coeffs, x0);
+      AD<double> psides0 = CppAD::atan(polydiff(_coeffs, x0)); 
 
       // Here's `x` to get you started.
       // The idea here is to constraint this value to be 0.
@@ -140,22 +150,63 @@ class FG_eval {
   }
 };
 
+typedef CPPAD_TESTVECTOR(double) Dvector;
+
+void solDump(double ref_v,
+             const Eigen::VectorXd& state,
+             const CppAD::ipopt::solve_result<Dvector>& solution) {
+  vector<double> mpc_x(N, 0.);
+  vector<double> mpc_y(N, 0.);
+  vector<double> a(N-1, 0.);
+  vector<double> delta(N-1, 0.);
+
+  for(size_t i = 0; i < N; ++i) {
+    mpc_x[i] = solution.x[x_start+i];
+    mpc_y[i] = solution.x[y_start+i];
+
+    if (i < N - 1) {
+      a[i]     = solution.x[a_start+i];
+      delta[i] = solution.x[delta_start+i];
+    }
+  }
+  
+  // dump solution for analyze
+  json sol;
+  sol["mpc_x"]     = mpc_x;
+  sol["mpc_y"]     = mpc_y;
+  sol["mpc_a"]     = a;
+  sol["mpc_delta"] = delta;
+  sol["N"]         = N;
+  sol["dt"]        = dt;
+  sol["ref_v"]     = ref_v;
+  sol["cost"]      = solution.obj_value;
+  sol["x"]         = state[0];
+  sol["y"]         = state[1];
+  sol["psi"]       = state[2];
+  sol["v"]         = state[3];
+  sol["cte"]       = state[4];
+  sol["epsi"]      = state[5];
+  cout << "sol-data " << sol << endl;
+}
+
 //
 // MPC class definition implementation.
 //
-MPC::MPC() 
+MPC::MPC(double ref_v, double lower_v, bool verbose) 
   : mpc_x(vector<double>(N, 0.))
   , mpc_y(vector<double>(N, 0.))
+  , _ref_v(ref_v)
+  , _lower_v(lower_v)
   , _prev_a(.1)
   , _prev_delta(.0)
+  , _verbose(verbose)
 {}
 
 MPC::~MPC() {}
 
-vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
+vector<double> MPC::Solve(const Eigen::VectorXd& state, Eigen::VectorXd coeffs) {
   bool ok = true;
-  size_t i;
-  typedef CPPAD_TESTVECTOR(double) Dvector;
+  size_t i;  
 
   // initial state
   double x    = state[0];
@@ -189,20 +240,20 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // to the max negative and positive values.
   for (int i = 0; i < delta_start; i++) {
     vars_lowerbound[i] = -1.0e19;
-    vars_upperbound[i] = 1.0e19;
+    vars_upperbound[i] =  1.0e19;
   }
 
   // The upper and lower limits of delta are set to deg2rad(-25) and deg2rad(25)
   for (int i = delta_start; i < a_start; i++) {
     vars_lowerbound[i] = -0.436332;
-    vars_upperbound[i] = 0.436332;
+    vars_upperbound[i] =  0.436332;
   }
 
   // Acceleration/decceleration upper and lower limits.
   // NOTE: Feel free to change this to something else.
   for (int i = a_start; i < n_vars; i++) {
     vars_lowerbound[i] = -1.0;
-    vars_upperbound[i] = 1.0;
+    vars_upperbound[i] =  1.0;
   }
 
   // to handle latency, the first few actuators are fixed from previous step
@@ -241,7 +292,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   constraints_upperbound[epsi_start] = epsi;
 
   // object that computes objective and constraints
-  FG_eval fg_eval(coeffs);
+  double dyn_ref_v = (abs(cte) > 1.0) ? _lower_v : _ref_v; // in case cte is big we should slow-down our car
+  FG_eval fg_eval(coeffs, dyn_ref_v);
 
   //
   // NOTE: You don't have to worry about these options
@@ -274,7 +326,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   // Cost
   auto cost = solution.obj_value;
-  std::cout << "Cost " << cost << std::endl;
+  // std::cout << "Cost " << cost << std::endl;
 
   // TODO: Return the first actuator values. The variables can be accessed with
   // `solution.x[i]`.
@@ -287,10 +339,23 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     mpc_x[i] = solution.x[x_start+i];
     mpc_y[i] = solution.x[y_start+i];
   }
-  return {solution.x[delta_start + latency_steps],   solution.x[a_start + latency_steps]};
+  
+  // dump solution for analyze
+  if (_verbose)
+    solDump(_ref_v, state, solution);
+
+  // we take the average of next latency_steps as new control input (since it will be fixed in the next latency_steps)
+  double new_delta = solution.x[delta_start + latency_steps];
+  double new_acc   = solution.x[a_start + latency_steps];
+
+  return {new_delta, new_acc};
 }
 
 void MPC::Update(const vector<double>& prev_acc) {
   _prev_delta = prev_acc[0];
   _prev_a     = prev_acc[1];
+}
+
+bool MPC::IsVerbose() const {
+  return _verbose;
 }

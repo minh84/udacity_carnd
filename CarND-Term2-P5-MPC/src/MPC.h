@@ -9,13 +9,13 @@ using namespace std;
 class MPC {
 
  public:
-  MPC();
+  MPC(double ref_v, double lower_v, bool verbose);
 
   virtual ~MPC();
 
   // Solve the model given an initial state and polynomial coefficients.
   // Return the first actuatotions.
-  vector<double> Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs);
+  vector<double> Solve(const Eigen::VectorXd& state, Eigen::VectorXd coeffs);
 
   // store predicted trajectory
   vector<double>  mpc_x;
@@ -23,9 +23,14 @@ class MPC {
 
   // update previous actuators
   void Update(const vector<double>& prev_acc);
+  
+  bool IsVerbose() const;
 private:
+  double _ref_v;
+  double _lower_v;
   double _prev_a;
   double _prev_delta;  
+  bool   _verbose;
 };
 
 #endif /* MPC_H */

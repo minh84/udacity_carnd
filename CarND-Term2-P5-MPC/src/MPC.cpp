@@ -11,7 +11,7 @@ using CppAD::AD;
 using namespace Utils;
 
 // TODO: Set the timestep length and duration
-size_t N  = 12;
+size_t N  = 10;
 double dt = 0.05;
 size_t latency_steps = 2;
 
@@ -245,8 +245,8 @@ vector<double> MPC::Solve(const Eigen::VectorXd& state, Eigen::VectorXd coeffs) 
 
   // The upper and lower limits of delta are set to deg2rad(-25) and deg2rad(25)
   for (int i = delta_start; i < a_start; i++) {
-    vars_lowerbound[i] = -0.436332;
-    vars_upperbound[i] =  0.436332;
+    vars_lowerbound[i] = -0.292;//-0.436332;
+    vars_upperbound[i] =  0.292;//0.436332;
   }
 
   // Acceleration/decceleration upper and lower limits.

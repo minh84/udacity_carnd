@@ -46,10 +46,21 @@ class Vehicle(object):
         """
 
         #Your code here
+        next_states = self.successor_states()
+        best_cost = float('inf')
+        best_trajectory = None
+
+        for state in next_states:
+            trajectory = self.generate_trajectory(state, predictions)
+            if trajectory is not None:
+                cost = calculate_cost(self, trajectory, predictions)
+
+                if cost < best_cost:
+                    best_cost = cost
+                    best_trajectory = trajectory
 
         #Change return value here
-        return [Vehicle(self.lane, self.s, self.v, self.a, self.state), 
-                      Vehicle(self.lane, self.position_at(1), self.v, 0, self.state)]
+        return best_trajectory
 
 
     def successor_states(self):

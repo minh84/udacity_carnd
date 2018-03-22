@@ -19,6 +19,11 @@ Vehicle::Vehicle(
 {
 }
 
+/** 
+ * This generate a simple trajectory of keeping the same lane
+ * given number of points and 
+ * 
+ */ 
 void Vehicle::getTrajectoryKeepLane(
   size_t nb_points,
   double s_inc,

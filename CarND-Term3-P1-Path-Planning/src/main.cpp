@@ -10,10 +10,11 @@
 #include "json.hpp"
 #include "utils.h"
 #include "vehicle.h"
+#include "experiments.h"
 
 using namespace std;
 using namespace utils;
-
+using namespace experiments;
 // for convenience
 using json = nlohmann::json;
 
@@ -56,7 +57,12 @@ int main() {
 	
 	HighwayMap highway(map_waypoints_x, map_waypoints_y, map_waypoints_s, map_waypoints_dx, map_waypoints_dy);
 
-  h.onMessage([&highway](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  // DEBUG file
+  int step = 0;
+  ofstream ofs ("drive-log-now.csv", std::ofstream::out);
+  bool file_closed = false;
+
+  h.onMessage([&highway, &step, &ofs, &file_closed](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -73,7 +79,7 @@ int main() {
         
         if (event == "telemetry") {
           // j[1] is the data JSON object
-          
+
         	// Main car's localization Data
           	double car_x = j[1]["x"];
           	double car_y = j[1]["y"];
@@ -85,8 +91,8 @@ int main() {
 						Vehicle vehicle(car_x, car_y, car_s, car_d, car_yaw, car_speed);
 
           	// Previous path data given to the Planner
-          	auto previous_path_x = j[1]["previous_path_x"];
-          	auto previous_path_y = j[1]["previous_path_y"];
+          	vector<double> previous_path_x = j[1]["previous_path_x"];
+          	vector<double> previous_path_y = j[1]["previous_path_y"];
           	// Previous path's end s and d values 
           	double end_path_s = j[1]["end_path_s"];
           	double end_path_d = j[1]["end_path_d"];
@@ -96,25 +102,64 @@ int main() {
 
           	json msgJson;
 
-          	vector<double> next_x_vals;
-          	vector<double> next_y_vals;
-
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
 
+            // first generate next points in Frenet 
 						double dist_inc = 0.3;
-						vehicle.getTrajectoryKeepLane(
-							50, 
-							dist_inc,
-							next_x_vals,
-							next_y_vals,
-							highway);
+            vector<double> next_s_vals;
+            vector<double> next_d_vals;
+            getTrajectoryKeepLaneFrenet(
+              next_s_vals,
+              next_d_vals,
+              50 - previous_path_x.size(),
+              (step==0) ? car_s : end_path_s,
+              dist_inc,
+              1);
+            
+						// convert to Catersian
+            vector<double> x_vals;
+          	vector<double> y_vals;
+            getXY(
+              x_vals,
+              y_vals,
+              next_s_vals,
+              next_d_vals,
+              highway);
+
+            // use previous path for continuity
+            vector<double> next_x_vals = previous_path_x;
+          	vector<double> next_y_vals = previous_path_y;
+
+            next_x_vals.insert(next_x_vals.end(), x_vals.begin(), x_vals.end());
+            next_y_vals.insert(next_y_vals.end(), y_vals.begin(), y_vals.end());
+
 						// DONE
 
           	msgJson["next_x"] = next_x_vals;
           	msgJson["next_y"] = next_y_vals;
 
           	auto msg = "42[\"control\","+ msgJson.dump()+"]";
+
+            // DEBUG: write to a file
+            ++step;
+            
+            if (!file_closed) {
+              logToFile(ofs, step, "x", car_x);
+              logToFile(ofs, step, "y", car_y);
+              logToFile(ofs, step, "s", car_s);
+              logToFile(ofs, step, "d", car_d);
+              logToFile(ofs, step, "yaw", car_yaw);
+              logToFile(ofs, step, "speed", car_speed);
+              logToFile(ofs, step, "end_path_s", end_path_s);
+              logToFile(ofs, step, "end_path_d", end_path_d);
+              logToFile(ofs, step, "previous_path_x", previous_path_x);
+              logToFile(ofs, step, "previous_path_y", previous_path_y);
+              logToFile(ofs, step, "next_s_vals", next_s_vals);
+              logToFile(ofs, step, "next_d_vals", next_d_vals);
+              logToFile(ofs, step, "next_x_vals", next_x_vals);
+              logToFile(ofs, step, "next_y_vals", next_y_vals);
+            }
 
           	//this_thread::sleep_for(chrono::milliseconds(1000));
           	ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
@@ -146,10 +191,12 @@ int main() {
     std::cout << "Connected!!!" << std::endl;
   });
 
-  h.onDisconnection([&h](uWS::WebSocket<uWS::SERVER> ws, int code,
+  h.onDisconnection([&h, &ofs, &file_closed](uWS::WebSocket<uWS::SERVER> ws, int code,
                          char *message, size_t length) {
     //ws.close();
     std::cout << "Disconnected" << std::endl;
+    ofs.close();
+    file_closed = true;
   });
 
   int port = 4567;
@@ -160,4 +207,7 @@ int main() {
     return -1;
   }
   h.run();
+  if (!file_closed) {
+    ofs.close();
+  }
 }

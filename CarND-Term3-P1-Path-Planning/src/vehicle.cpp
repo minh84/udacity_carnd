@@ -1,5 +1,6 @@
 #include "vehicle.h"
 #include "utils.h"
+#include <math.h>
 
 using namespace utils;
 using namespace std;
@@ -17,32 +18,4 @@ Vehicle::Vehicle(
   , _yaw(yaw)
   , _speed(speed)
 {
-}
-
-/** 
- * This generate a simple trajectory of keeping the same lane
- * given number of points and 
- * 
- */ 
-void Vehicle::getTrajectoryKeepLane(
-  size_t nb_points,
-  double s_inc,
-  vector<double>& next_x_vals,
-  vector<double>& next_y_vals,
-  const HighwayMap& highway)
-{
-  // clear & reserve
-  next_x_vals.resize(nb_points);
-  next_y_vals.resize(nb_points);
-  double next_s = _s;
-  for (int i = 0; i < nb_points; ++i) {
-
-    // increment s and keep using same current lane _d
-    next_s += s_inc;
-    vector<double> xy = getXY(next_s, _d, highway.maps_s, highway.maps_x, highway.maps_y);
-
-    // append to trajectory
-    next_x_vals[i] = xy[0];
-    next_y_vals[i] = xy[1];
-  }
 }

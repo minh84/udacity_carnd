@@ -1,10 +1,28 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <chrono>
+#include <fstream>
 #include <string>
 #include <vector>
 
 namespace utils {
+  // Store highways map to make it easier to pass as an argument
+  // we don't 
+  struct HighwayMap {
+    std::vector<double> maps_x;
+    std::vector<double> maps_y;
+    std::vector<double> maps_s;
+    std::vector<double> maps_dx;
+    std::vector<double> maps_dy;
+    HighwayMap(
+      const std::vector<double>& x,
+      const std::vector<double>& y,
+      const std::vector<double>& s,
+      const std::vector<double>& dx,
+      const std::vector<double>& dy);
+  };
+
   constexpr double pi();
   double deg2rad(double x);
   double rad2deg(double x);
@@ -35,28 +53,33 @@ namespace utils {
     const std::vector<double> &maps_y);
 
   // Transform from Frenet s,d coordinates to Cartesian x,y
-  std::vector<double> getXY(
+  void getXY(
+    double&x,
+    double&y,
     double s, 
     double d, 
     const std::vector<double> &maps_s, 
     const std::vector<double> &maps_x, 
     const std::vector<double> &maps_y);
 
-  // Store highways map to make it easier to pass as an argument
-  // we don't 
-  struct HighwayMap {
-    std::vector<double> maps_x;
-    std::vector<double> maps_y;
-    std::vector<double> maps_s;
-    std::vector<double> maps_dx;
-    std::vector<double> maps_dy;
-    HighwayMap(
-      const std::vector<double>& x,
-      const std::vector<double>& y,
-      const std::vector<double>& s,
-      const std::vector<double>& dx,
-      const std::vector<double>& dy);
-  };
+  void getXY(
+          std::vector<double>& x_vals,
+          std::vector<double>& y_vals,
+    const std::vector<double>& s_vals,
+    const std::vector<double>& d_vals,
+    const HighwayMap& highway_map);
+  
+  void logToFile(
+    std::ofstream& outfile,
+    int step,
+    const std::string& tag,
+    double value);
+
+  void logToFile(
+    std::ofstream& outfile,
+    int step,
+    const std::string& tag,
+    const std::vector<double>& values);
 }
 
 #endif

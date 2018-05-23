@@ -1,6 +1,7 @@
 #include "utils.h"
 
 #include <math.h>
+#include <iomanip>
 
 using namespace std;
 namespace utils {
@@ -75,10 +76,10 @@ namespace utils {
     if(angle > pi()/4)
     {
       closestWaypoint++;
-    if (closestWaypoint == maps_x.size())
-    {
-      closestWaypoint = 0;
-    }
+      if (closestWaypoint == maps_x.size())
+      {
+        closestWaypoint = 0;
+      }
     }
 
     return closestWaypoint;
@@ -140,7 +141,9 @@ namespace utils {
   }
 
   // Transform from Frenet s,d coordinates to Cartesian x,y
-  vector<double> getXY(
+  void getXY(
+    double&x,
+    double&y,
     double s, 
     double d, 
     const vector<double> &maps_s, 
@@ -165,10 +168,30 @@ namespace utils {
 
     double perp_heading = heading-pi()/2;
 
-    double x = seg_x + d*cos(perp_heading);
-    double y = seg_y + d*sin(perp_heading);
+    x = seg_x + d*cos(perp_heading);
+    y = seg_y + d*sin(perp_heading);
+  }
 
-    return {x,y};
+  void getXY(
+          std::vector<double>& x_vals,
+          std::vector<double>& y_vals,
+    const std::vector<double>& s_vals,
+    const std::vector<double>& d_vals,
+    const HighwayMap& highway_map) 
+  {
+    size_t nb_input = s_vals.size();
+    x_vals.resize(nb_input);
+    y_vals.resize(nb_input);
+
+    for(size_t i = 0; i < nb_input; ++i) {
+      getXY(x_vals[i],
+            y_vals[i],
+            s_vals[i],
+            d_vals[i],
+            highway_map.maps_s,
+            highway_map.maps_x,
+            highway_map.maps_y);
+    }
   }
 
   HighwayMap::HighwayMap(
@@ -183,5 +206,32 @@ namespace utils {
       , maps_dx(dx)
       , maps_dy(dy)
   {
+  }
+
+  void logToFile(
+    std::ofstream& outfile,
+    int step,
+    const std::string& tag,
+    double value)
+  {
+    outfile << step << ";" << tag << ";" 
+            << std::fixed << std::setprecision(3) << value << "\n"; 
+  }
+
+  void logToFile(
+    std::ofstream& outfile,
+    int step,
+    const std::string& tag,
+    const std::vector<double>& values)
+  {
+    outfile << step << ";" << tag << ";[";
+    outfile << std::fixed << std::setprecision(3);
+    if (!values.empty()) {
+      outfile << values[0];
+      for (int i = 1; i < values.size(); ++i) {
+        outfile << "," << values[i];
+      }
+    }
+    outfile << "]\n";
   }
 }

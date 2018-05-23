@@ -19,12 +19,6 @@ public:
     double yaw, 
     double speed);
 
-  void getTrajectoryKeepLane(
-    size_t nb_points,
-    double s_inc,
-    std::vector<double>& next_x_vals,
-    std::vector<double>& next_y_vals,
-    const utils::HighwayMap& highway);
 };
 
 #endif

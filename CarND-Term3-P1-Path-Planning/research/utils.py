@@ -72,6 +72,13 @@ class Highway(object):
         frenet_s = np.sum(diff_dist) + distance(0, 0, proj_x, proj_y)
 
         return frenet_s, frenet_d
+    
+    def getPrevS(self, s):
+        if (s >= self._highway_df.s.values[-1]):
+            prev_wp = len(self._highway_df.s) - 1
+        else:
+            prev_wp = np.argmax(self._highway_df.s > s) - 1
+        return prev_wp
 
     def getXY(self, s, d):
         if (s >= self._highway_df.s.values[-1]):

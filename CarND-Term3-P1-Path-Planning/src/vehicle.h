@@ -19,6 +19,13 @@ public:
     double yaw, 
     double speed);
 
+  double x() const;
+  double y() const;
+  double s() const;
+  double d() const;
+  double yaw() const;
+  double speed() const;
+
 };
 
 #endif

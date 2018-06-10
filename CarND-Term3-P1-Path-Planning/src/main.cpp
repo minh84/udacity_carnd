@@ -106,31 +106,26 @@ int main() {
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
 
             // first generate next points in Frenet 
-						double dist_inc = 0.3;
-            vector<double> next_s_vals;
-            vector<double> next_d_vals;
-            getTrajectoryKeepLaneFrenet(
-              next_s_vals,
-              next_d_vals,
-              50 - previous_path_x.size(),
-              (step==0) ? car_s : end_path_s,
-              dist_inc,
-              1);
-            
-						// convert to Catersian
+            int target_lane = 1;
+            double target_speed = 0.3;
             vector<double> x_vals;
-          	vector<double> y_vals;
-            getXY(
-              x_vals,
+            vector<double> y_vals;
+            getTrajectorySpline(
+              x_vals, 
               y_vals,
-              next_s_vals,
-              next_d_vals,
-              highway);
-
-            // use previous path for continuity
+              highway,
+              vehicle,
+              previous_path_x,
+              previous_path_y,
+              target_lane,
+              target_speed
+              );
+            
+            // use previous points
             vector<double> next_x_vals = previous_path_x;
-          	vector<double> next_y_vals = previous_path_y;
+            vector<double> next_y_vals = previous_path_y;
 
+            // append next points
             next_x_vals.insert(next_x_vals.end(), x_vals.begin(), x_vals.end());
             next_y_vals.insert(next_y_vals.end(), y_vals.begin(), y_vals.end());
 
@@ -155,8 +150,8 @@ int main() {
               logToFile(ofs, step, "end_path_d", end_path_d);
               logToFile(ofs, step, "previous_path_x", previous_path_x);
               logToFile(ofs, step, "previous_path_y", previous_path_y);
-              logToFile(ofs, step, "next_s_vals", next_s_vals);
-              logToFile(ofs, step, "next_d_vals", next_d_vals);
+              //logToFile(ofs, step, "next_s_vals", next_s_vals);
+              //logToFile(ofs, step, "next_d_vals", next_d_vals);
               logToFile(ofs, step, "next_x_vals", next_x_vals);
               logToFile(ofs, step, "next_y_vals", next_y_vals);
             }

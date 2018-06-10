@@ -19,3 +19,22 @@ Vehicle::Vehicle(
   , _speed(speed)
 {
 }
+
+double Vehicle::x() const {
+  return _x;
+}
+double Vehicle::y() const {
+  return _y;
+}
+double Vehicle::s() const {
+  return _s;
+}
+double Vehicle::d() const {
+  return _d;
+}
+double Vehicle::yaw() const {
+  return _yaw;
+}
+double Vehicle::speed() const {
+  return _speed;
+}

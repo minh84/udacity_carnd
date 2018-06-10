@@ -68,7 +68,24 @@ namespace utils {
     const std::vector<double>& s_vals,
     const std::vector<double>& d_vals,
     const HighwayMap& highway_map);
+
+  // Convert from global => local coordinate (inplace)
+  void globalToLocal(
+      std::vector<double>& x_vals,
+      std::vector<double>& y_vals,
+      double ref_x,
+      double ref_y,
+      double ref_yaw
+  );
   
+  void localToGlobal(
+      std::vector<double>& x_vals,
+      std::vector<double>& y_vals,
+      double ref_x,
+      double ref_y,
+      double ref_yaw
+  );
+
   void logToFile(
     std::ofstream& outfile,
     int step,

@@ -194,6 +194,48 @@ namespace utils {
     }
   }
 
+  void globalToLocal(
+      std::vector<double>& x_vals,
+      std::vector<double>& y_vals,
+      double ref_x,
+      double ref_y,
+      double ref_yaw
+  ) {
+    double cos_turn = cos(ref_yaw);
+    double sin_turn = sin(ref_yaw);
+
+    for(size_t i = 0; i < x_vals.size(); ++i) {
+      // shift
+      double shift_x = x_vals[i] - ref_x;
+      double shift_y = y_vals[i] - ref_y;
+
+      // turn
+      x_vals[i] = shift_x * cos_turn + shift_y * sin_turn;
+      y_vals[i] = -shift_x * sin_turn + shift_y * cos_turn;
+    }
+  }
+
+  void localToGlobal(
+      std::vector<double>& x_vals,
+      std::vector<double>& y_vals,
+      double ref_x,
+      double ref_y,
+      double ref_yaw
+  ) {
+    double cos_turn = cos(ref_yaw);
+    double sin_turn = sin(ref_yaw);
+
+    for(size_t i = 0; i < x_vals.size(); ++i) {
+      // turn
+      double shift_x = x_vals[i] * cos_turn - y_vals[i] * sin_turn;
+      double shift_y = x_vals[i] * sin_turn + y_vals[i] * cos_turn;
+
+      // shift
+      x_vals[i] = ref_x + shift_x;
+      y_vals[i] = ref_y + shift_y;
+    }
+  }
+
   HighwayMap::HighwayMap(
       const std::vector<double>& x,
       const std::vector<double>& y,

@@ -3,6 +3,7 @@
 
 #include <vector>
 #include "utils.h"
+#include "vehicle.h"
 
 namespace experiments {
     void getTrajectoryStraightLane(
@@ -22,6 +23,17 @@ namespace experiments {
         double s_prev,
         double s_inc,
         int lane
+    );
+
+    void getTrajectorySpline(
+              std::vector<double>& next_x_vals,
+              std::vector<double>& next_y_vals,
+        const utils::HighwayMap& highway_map,
+        const Vehicle& car,
+        const std::vector<double>& prev_path_x,
+        const std::vector<double>& prev_path_y,
+        int target_lane,
+        double target_speed
     );
 }
 

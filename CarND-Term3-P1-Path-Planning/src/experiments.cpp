@@ -3,44 +3,41 @@
 #include <math.h>
 
 using namespace std;
-using namespace utils;
+using namespace path_planning;
 
 namespace {
-    void getPrevReferencePoints(
-              double& ref_x,
-              double& ref_y,
-              double& ref_yaw,
-              std::vector<double>& ptsx,
-              std::vector<double>& ptsy,
-        const Vehicle& car,
-        const std::vector<double>& prev_path_x,
-        const std::vector<double>& prev_path_y
+    void getTrajectoryKeepLaneFrenet(
+        std::vector<double>& next_x_vals,
+        std::vector<double>& next_y_vals,   
+        std::vector<double>& next_s_vals,
+        std::vector<double>& next_d_vals,
+        const HighwayMap& highway_map,
+        size_t nb_points,
+        double s_prev,
+        double s_inc,
+        int lane
     ) {
-        // we use previous planned points as reference
-        size_t prev_size = prev_path_x.size();
+        // clear & reserve
+        next_s_vals.resize(nb_points);
+        next_d_vals.resize(nb_points);
 
-        double prev_x, prev_y;
+        double next_s = s_prev;
+        double d = 2.0 + 4.0 * lane;
+        for (int i = 0; i < nb_points; ++i) {
+            // increase s
+            next_s += s_inc;
 
-        if (prev_size < 2) {
-            ref_x = car.x();
-            ref_y = car.y();
-            ref_yaw = utils::deg2rad(car.yaw());
-            prev_x = ref_x - cos(ref_yaw);
-            prev_y = ref_y - sin(ref_yaw);
-        } else {
-            ref_x = prev_path_x[prev_size - 1];
-            ref_y = prev_path_y[prev_size - 1];
-            prev_x = prev_path_x[prev_size - 2];
-            prev_y = prev_path_y[prev_size - 2];
-            ref_yaw = atan2(ref_y - prev_y, ref_x - prev_x);
+            next_s_vals[i] = next_s;
+            next_d_vals[i] = d;
         }
 
-        // use 2 previous points to ensure smoothness since Spline is continuous in values and derivatives
-        ptsx.push_back(prev_x); 
-        ptsx.push_back(ref_x);
-
-        ptsy.push_back(prev_y); 
-        ptsy.push_back(ref_y);
+        getXY(
+            next_x_vals, 
+            next_y_vals,
+            next_s_vals,
+            next_d_vals,
+            highway_map
+        );
     }
 
     // this plan next points using Spline in local coordinate with const speed
@@ -71,7 +68,7 @@ namespace {
     }
 }
 
-namespace experiments {
+namespace path_planning {
     void getTrajectoryStraightLane(
         std::vector<double>& next_x_vals,
         std::vector<double>& next_y_vals,
@@ -91,70 +88,105 @@ namespace experiments {
         }
     }
 
-    void getTrajectoryKeepLaneFrenet(
-        std::vector<double>& next_s_vals,
-        std::vector<double>& next_d_vals,
+    void getTrajectoryKeepLaneV1(
+              std::vector<double>& next_x_vals,
+              std::vector<double>& next_y_vals,
+              std::vector<double>& next_s_vals,
+              std::vector<double>& next_d_vals,
+        const HighwayMap& highway_map,
+        const Vehicle& car,
         size_t nb_points,
-        double s_prev,
-        double s_inc,
-        int lane
+        double s_speed,
+        int target_lane
     ) {
-        // clear & reserve
-        next_s_vals.resize(nb_points);
-        next_d_vals.resize(nb_points);
-
-        double next_s = s_prev;
-        double d = 2.0 + 4.0 * lane;
-        for (int i = 0; i < nb_points; ++i) {
-            // increase s
-            next_s += s_inc;
-
-            next_s_vals[i] = next_s;
-            next_d_vals[i] = d;
-        }
+        getTrajectoryKeepLaneFrenet(
+            next_x_vals,
+            next_y_vals,
+            next_s_vals,
+            next_d_vals,
+            highway_map,
+            nb_points,
+            car.s(),
+            s_speed, 
+            target_lane
+        );
     }
 
-    void getTrajectorySpline(
+    void getTrajectoryKeepLaneV2(
+              std::vector<double>& next_x_vals,
+              std::vector<double>& next_y_vals,
+              std::vector<double>& next_s_vals,
+              std::vector<double>& next_d_vals,
+        const HighwayMap& highway_map,
+        const Vehicle& car,
+        size_t nb_points,
+        double s_speed,
+        int target_lane
+    ) {
+        size_t nb_next_points = nb_points - car.prev_size();
+
+        getTrajectoryKeepLaneFrenet(
+            next_x_vals,
+            next_y_vals,
+            next_s_vals,
+            next_d_vals,
+            highway_map,
+            nb_next_points,
+            car.end_path_s(),
+            s_speed, 
+            target_lane
+        );
+
+        // append previous planned x,y to the begin of next planned x,y
+        car.appendPrevPoints(next_x_vals, next_y_vals);
+    }
+    
+
+    void getTrajectoryKeepLaneSplineConstSpeed(
         std::vector<double>& next_x_vals,
         std::vector<double>& next_y_vals,
-        const utils::HighwayMap& highway_map,
+        const HighwayMap& highway_map,
         const Vehicle& car,
-        const std::vector<double>& prev_path_x,
-        const std::vector<double>& prev_path_y,
-        int target_lane,
-        double target_speed
+        size_t nb_points,
+        double target_speed,
+        int target_lane
     ) {
+        // step 1: get 2 last previous planned points to ensure Spline generate smooth trajectory
         double ref_x;
         double ref_y;
         double ref_yaw;
         vector<double> ptsx;
         vector<double> ptsy;
 
-        getPrevReferencePoints(ref_x, ref_y, ref_yaw, ptsx, ptsy, car, prev_path_x, prev_path_y);
+        car.getPrevReferencePoints(ref_x, ref_y, ref_yaw, ptsx, ptsy);
         
-        // setup target points using 30m apart in Frenet then convert to Cartesian
+        // step 2: setup target points using 30m apart in Frenet (start from current position) 
+        // then convert to Cartesian
         double car_s = car.s();
         std::vector<double> s_vals = {car_s + 30, car_s + 60, car_s + 90};
         std::vector<double> d_vals = std::vector<double>(3, 2 + 4 * target_lane);
 
         std::vector<double> x_vals;
         std::vector<double> y_vals;
-        utils::getXY(x_vals, y_vals, s_vals, d_vals, highway_map);
+        getXY(x_vals, y_vals, s_vals, d_vals, highway_map);
 
         // points inlcudes previous point and future points to ensure the smoothness
         ptsx.insert(ptsx.end(), x_vals.begin(), x_vals.end());
         ptsy.insert(ptsy.end(), y_vals.begin(), y_vals.end());
 
         // transform to local coordinate
-        utils::globalToLocal(ptsx, ptsy, ref_x, ref_y, ref_yaw);
+        globalToLocal(ptsx, ptsy, ref_x, ref_y, ref_yaw);
 
         // spline
         tk::spline s;
         s.set_points(ptsx, ptsy);
 
         // plan next point
-        size_t nb_next_point = 50 - prev_path_x.size();
+        size_t nb_next_point = nb_points - car.prev_size();
         simplePlanNextPointLocalCoord(next_x_vals, next_y_vals, s, target_speed, nb_next_point);
-        utils::localToGlobal(next_x_vals, next_y_vals, ref_x, ref_y, ref_yaw);
+        localToGlobal(next_x_vals, next_y_vals, ref_x, ref_y, ref_yaw);
+
+        // append prev points
+        car.appendPrevPoints(next_x_vals, next_y_vals);
     }
 }

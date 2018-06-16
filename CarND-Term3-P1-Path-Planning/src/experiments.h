@@ -5,7 +5,7 @@
 #include "utils.h"
 #include "vehicle.h"
 
-namespace experiments {
+namespace path_planning {
     void getTrajectoryStraightLane(
         std::vector<double>& next_x_vals,
         std::vector<double>& next_y_vals,
@@ -16,24 +16,38 @@ namespace experiments {
         double yaw
     );
 
-    void getTrajectoryKeepLaneFrenet(
-        std::vector<double>& next_s_vals,
-        std::vector<double>& next_d_vals,
-        size_t nb_points,
-        double s_prev,
-        double s_inc,
-        int lane
-    );
-
-    void getTrajectorySpline(
+    void getTrajectoryKeepLaneV1(
               std::vector<double>& next_x_vals,
               std::vector<double>& next_y_vals,
-        const utils::HighwayMap& highway_map,
+              std::vector<double>& next_s_vals,
+              std::vector<double>& next_d_vals,
+        const HighwayMap& highway_map,
         const Vehicle& car,
-        const std::vector<double>& prev_path_x,
-        const std::vector<double>& prev_path_y,
-        int target_lane,
-        double target_speed
+        size_t nb_points,
+        double s_speed,
+        int target_lane
+    );
+
+    void getTrajectoryKeepLaneV2(
+              std::vector<double>& next_x_vals,
+              std::vector<double>& next_y_vals,
+              std::vector<double>& next_s_vals,
+              std::vector<double>& next_d_vals,
+        const HighwayMap& highway_map,
+        const Vehicle& car,
+        size_t nb_points,
+        double s_speed,
+        int target_lane
+    );
+
+    void getTrajectoryKeepLaneSplineConstSpeed(
+              std::vector<double>& next_x_vals,
+              std::vector<double>& next_y_vals,
+        const HighwayMap& highway_map,
+        const Vehicle& car,
+        size_t nb_points,
+        double target_speed,
+        int target_lane
     );
 }
 

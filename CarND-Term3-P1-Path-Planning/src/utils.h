@@ -6,7 +6,29 @@
 #include <string>
 #include <vector>
 
-namespace utils {
+namespace path_planning {
+  // Define const
+
+  // number of point
+  static const size_t NB_POINTS = 50;
+
+  // max speed is 50 MPH, then we convert to MPS
+  static const double MAX_SPEED_MPH = 49.5;
+  static const double MPH_TO_MPS = 0.44704;
+  static const double MAX_SPEED_MPS = MAX_SPEED_MPH * MPH_TO_MPS;
+
+  // each time step is 20ms = 0.02 second
+  static const double TIME_STEP = 0.02;
+  static const double MAX_DISTANCE_PER_STEP = TIME_STEP * MAX_SPEED_MPS;
+
+  // max acceleration is 10m/s^2
+  static const double MAX_ACC = 5; // m/s2
+  static const double MAX_SPEED_DIFF = MAX_ACC * TIME_STEP;
+  static const double MAX_DIST_DIFF = MAX_SPEED_DIFF * TIME_STEP;
+
+  // safety distance 30m
+  static const double SAFETY_DIST = 30; 
+
   // Store highways map to make it easier to pass as an argument
   // we don't 
   struct HighwayMap {
@@ -23,6 +45,9 @@ namespace utils {
       const std::vector<double>& dy);
   };
 
+   // cap distance to be in range [MAX_DIST_DIFF, MAX_DISTANCE_PER_STEP]
+  double capDist(double dist);
+
   constexpr double pi();
   double deg2rad(double x);
   double rad2deg(double x);
@@ -30,6 +55,8 @@ namespace utils {
   std::string hasData(const std::string& s);
 
   double distance(double x1, double y1, double x2, double y2);
+
+  int getLane(double d);
 
   int ClosestWaypoint(
       double x, 

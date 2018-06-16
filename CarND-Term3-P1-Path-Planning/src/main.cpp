@@ -1,6 +1,7 @@
 #include <fstream>
 #include <chrono>
 #include <iostream>
+#include <string>
 #include <thread>
 
 #include <uWS/uWS.h>
@@ -11,10 +12,11 @@
 #include "utils.h"
 #include "vehicle.h"
 #include "experiments.h"
+#include "behavior.h"
 
 using namespace std;
-using namespace utils;
-using namespace experiments;
+using namespace path_planning;
+
 // for convenience
 using json = nlohmann::json;
 
@@ -87,8 +89,7 @@ int main() {
           	double car_d = j[1]["d"];
           	double car_yaw = j[1]["yaw"];
 						double car_speed = j[1]["speed"];
-						
-						Vehicle vehicle(car_x, car_y, car_s, car_d, car_yaw, car_speed);
+					
 
           	// Previous path data given to the Planner
           	vector<double> previous_path_x = j[1]["previous_path_x"];
@@ -97,40 +98,53 @@ int main() {
           	double end_path_s = j[1]["end_path_s"];
           	double end_path_d = j[1]["end_path_d"];
 
+            Vehicle vehicle(
+              car_x, 
+              car_y, 
+              car_s, 
+              car_d, 
+              car_yaw, 
+              car_speed, 
+              previous_path_x,
+              previous_path_y,
+              end_path_s,
+              end_path_d
+            );
+
           	// Sensor Fusion Data, a list of all other cars on the same side of the road.
           	auto sensor_fusion = j[1]["sensor_fusion"];
-
-          	json msgJson;
-
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
 
             // first generate next points in Frenet 
+            vector<double> next_x_vals;
+            vector<double> next_y_vals;
+            vector<double> next_s_vals;
+            vector<double> next_d_vals;
+
+            double target_dist = 0.3;
             int target_lane = 1;
-            double target_speed = 0.3;
-            vector<double> x_vals;
-            vector<double> y_vals;
-            getTrajectorySpline(
-              x_vals, 
-              y_vals,
+            /*getTrajectoryKeepLaneSplineConstSpeed(
+              next_x_vals,
+              next_y_vals,
               highway,
               vehicle,
-              previous_path_x,
-              previous_path_y,
-              target_lane,
-              target_speed
-              );
+              50,
+              target_dist,
+              target_lane
+            );*/
             
-            // use previous points
-            vector<double> next_x_vals = previous_path_x;
-            vector<double> next_y_vals = previous_path_y;
-
-            // append next points
-            next_x_vals.insert(next_x_vals.end(), x_vals.begin(), x_vals.end());
-            next_y_vals.insert(next_y_vals.end(), y_vals.begin(), y_vals.end());
+            generateTrajectory(
+              next_x_vals,
+              next_y_vals,
+              highway,
+              vehicle,
+              sensor_fusion
+            );
+            
 
 						// DONE
-
+            json msgJson;
           	msgJson["next_x"] = next_x_vals;
           	msgJson["next_y"] = next_y_vals;
 
@@ -150,8 +164,8 @@ int main() {
               logToFile(ofs, step, "end_path_d", end_path_d);
               logToFile(ofs, step, "previous_path_x", previous_path_x);
               logToFile(ofs, step, "previous_path_y", previous_path_y);
-              //logToFile(ofs, step, "next_s_vals", next_s_vals);
-              //logToFile(ofs, step, "next_d_vals", next_d_vals);
+              logToFile(ofs, step, "next_s_vals", next_s_vals);
+              logToFile(ofs, step, "next_d_vals", next_d_vals);
               logToFile(ofs, step, "next_x_vals", next_x_vals);
               logToFile(ofs, step, "next_y_vals", next_y_vals);
             }

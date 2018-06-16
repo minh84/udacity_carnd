@@ -4,7 +4,26 @@
 #include <iomanip>
 
 using namespace std;
-namespace utils {
+namespace path_planning {
+  HighwayMap::HighwayMap(
+      const std::vector<double>& x,
+      const std::vector<double>& y,
+      const std::vector<double>& s,
+      const std::vector<double>& dx,
+      const std::vector<double>& dy) 
+      : maps_x(x)
+      , maps_y(y)
+      , maps_s(s)
+      , maps_dx(dx)
+      , maps_dy(dy)
+  {
+  }
+
+   // cap distance to be in range [MAX_DIST_DIFF, MAX_DISTANCE_PER_STEP]
+  double capDist(double dist) {
+    return max(MAX_DIST_DIFF, min(MAX_DISTANCE_PER_STEP, dist));
+  }
+
   // For converting back and forth between radians and degrees.
   constexpr double pi() { return M_PI; }
   double deg2rad(double x) { return x * pi() / 180; }
@@ -28,6 +47,23 @@ namespace utils {
   double distance(double x1, double y1, double x2, double y2)
   {
     return sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
+  }
+
+  // d is distance from center and each lane = 4m
+  int getLane(double d) {
+    int lane = -1;
+    if (d > 0 && d < 4) {
+      lane = 0;
+    }
+    
+    if (d > 4 && d < 8) {
+      lane = 1;
+    } 
+    
+    if (d > 8 && d < 12) {
+      lane = 2;
+    }
+    return lane;
   }
 
   int ClosestWaypoint(double x, 
@@ -234,20 +270,6 @@ namespace utils {
       x_vals[i] = ref_x + shift_x;
       y_vals[i] = ref_y + shift_y;
     }
-  }
-
-  HighwayMap::HighwayMap(
-      const std::vector<double>& x,
-      const std::vector<double>& y,
-      const std::vector<double>& s,
-      const std::vector<double>& dx,
-      const std::vector<double>& dy) 
-      : maps_x(x)
-      , maps_y(y)
-      , maps_s(s)
-      , maps_dx(dx)
-      , maps_dy(dy)
-  {
   }
 
   void logToFile(

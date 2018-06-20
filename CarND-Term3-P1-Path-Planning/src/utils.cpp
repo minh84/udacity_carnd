@@ -51,19 +51,23 @@ namespace path_planning {
 
   // d is distance from center and each lane = 4m
   int getLane(double d) {
-    int lane = -1;
-    if (d > 0 && d < 4) {
-      lane = 0;
+    if (d < 0 || d > 12) {
+      return -1;
     }
-    
-    if (d > 4 && d < 8) {
-      lane = 1;
-    } 
-    
-    if (d > 8 && d < 12) {
-      lane = 2;
+
+    if (d < 4) {
+      return 0;
+    } else if (d < 8) {
+      return 1;
+    } else {
+      return 2;
     }
-    return lane;
+  }
+
+  double getCarSpeed(const std::vector<double>& car_sensor) {
+    double vx = car_sensor[3];
+    double vy = car_sensor[4];
+    return sqrt(vx*vx + vy*vy);
   }
 
   int ClosestWaypoint(double x, 

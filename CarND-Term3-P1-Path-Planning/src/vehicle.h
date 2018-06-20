@@ -12,6 +12,8 @@ namespace path_planning {
     double _yaw; 
     double _speed;
 
+    int _lane;
+
     // previous path-planning
     const std::vector<double>& _prev_path_x;
     const std::vector<double>& _prev_path_y;
@@ -73,11 +75,18 @@ namespace path_planning {
       std::vector<double>& ptsy
     ) const;
 
+    // compute Spline points 
+    void getSplinePoints(
+      std::vector<double>& ptsx,
+      std::vector<double>& ptsy,
+      const HighwayMap& highway_map,
+      int lane,
+      double s_step
+    ) const;
+
     // given a car-sensor, we estimate the future position in Frenet after the car
     // passed all previous planned points
-    void getFuturePosition(
-      int& car_lane,
-      double& future_s,
+    double getFuturePosition(
       const std::vector<double>& car_sensor
     ) const;
 

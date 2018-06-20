@@ -27,6 +27,7 @@ namespace path_planning {
     , _end_path_s(end_path_s)
     , _end_path_d(end_path_d)
   {
+    _lane = getLane(_d);
   }
 
   double Vehicle::x() const {
@@ -54,7 +55,7 @@ namespace path_planning {
   }
 
   int Vehicle::lane() const {
-    return getLane(_d);
+    return _lane;
   }
 
   size_t Vehicle::prev_size() const {
@@ -121,27 +122,38 @@ namespace path_planning {
     ptsy.push_back(ref_y);
   }
 
-  void Vehicle::getFuturePosition(
-      int& car_lane,
-      double& future_s,
+  void Vehicle::getSplinePoints(
+      std::vector<double>& ptsx,
+      std::vector<double>& ptsy,
+      const HighwayMap& highway_map,
+      int lane,
+      double s_step
+    ) const {
+    
+    double d = 2 + 4 * lane;
+    double car_s = end_path_s();
+
+    // we expect that at car_s + s_step, we can change to lane d = 2 + 4 * lane
+    std::vector<double> s_vals = {car_s + s_step, car_s + 2*s_step, car_s + 3*s_step};
+    std::vector<double> d_vals = {d, d, d};
+
+    getXY(ptsx, ptsy, s_vals, d_vals, highway_map);
+  } 
+
+  double Vehicle::getFuturePosition(
       const std::vector<double>& car_sensor
     ) const {
     // extract x,y,vx,vy,s,d from car_sensor
-    double x = car_sensor[1];
-    double y = car_sensor[2];
     double vx = car_sensor[3];
     double vy = car_sensor[4];
     double s = car_sensor[5];
-    double d = car_sensor[6];
-
-    car_lane = getLane(d);
 
     // the car's speed
     double car_speed = sqrt(vx * vx + vy * vy);
     
     // number of planned points
     size_t prev_size = _prev_path_x.size();
-    future_s = s + prev_size * TIME_STEP * car_speed;
+    return s + prev_size * TIME_STEP * car_speed;
   }
 
   bool Vehicle::isAhead(double future_s) const {

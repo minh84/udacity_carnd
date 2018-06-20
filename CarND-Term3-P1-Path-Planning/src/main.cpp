@@ -63,8 +63,16 @@ int main() {
   int step = 0;
   ofstream ofs ("drive-log-now.csv", std::ofstream::out);
   bool file_closed = false;
+  double ref_v = 0.;
 
-  h.onMessage([&highway, &step, &ofs, &file_closed](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  h.onMessage(
+    [&highway, &ref_v, &step, &ofs, &file_closed](
+      uWS::WebSocket<uWS::SERVER> ws, 
+      char *data, 
+      size_t length, 
+      uWS::OpCode opCode
+    ) {
+        
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -134,12 +142,15 @@ int main() {
               target_lane
             );*/
             
-            generateTrajectory(
+            getTrajectoryKeepLaneNoRed(
               next_x_vals,
               next_y_vals,
+              ref_v,
               highway,
               vehicle,
-              sensor_fusion
+              sensor_fusion,
+              50,
+              MAX_ACC
             );
             
 

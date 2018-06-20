@@ -57,6 +57,7 @@ namespace path_planning {
   double distance(double x1, double y1, double x2, double y2);
 
   int getLane(double d);
+  double getCarSpeed(const std::vector<double>& car_sensor);
 
   int ClosestWaypoint(
       double x, 

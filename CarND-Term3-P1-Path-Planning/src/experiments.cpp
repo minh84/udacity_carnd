@@ -162,44 +162,46 @@ namespace {
         double nearest_right_ahead = 10000;
 
         for (int i = 0; i < sensor_fusion.size(); ++i) {
-            if (!can_change_left && !can_change_left) {
-                return 0;
+            if (!can_change_left && !can_change_right) {
+                break;
             }
 
             auto& car_i = sensor_fusion[i]; // id, x, y, vx, vy, s, d
-            double dist = abs(car_i[5] - s_current);
-            double future_dist = abs(car.getFuturePosition(car_i) - s_future);
-
             int car_i_lane = getLane(car_i[6]);
-            if (car_i_lane == -1 
-                || car_i_lane == lane
-                || dist > look_dist) {
+            if (car_i_lane == -1 || car_i_lane == lane ) {
                 continue;
             }
+
+            double dist = abs(car_i[5] - s_current);
+
+            if (car_i[5] > s_current) { // get nearest ahead
+                if (car_i_lane == lane - 1) {
+                    nearest_left_ahead = min(dist, nearest_left_ahead);
+                } else {
+                    nearest_right_ahead = min(dist, nearest_right_ahead);
+                }
+            }
             
-            if (dist < safety_dist || future_dist < dist) {
+            if (dist > look_dist) { // out of look range
+                continue;
+            }
+
+            double future_dist = abs(car.getFuturePosition(car_i) - s_future);
+            if (dist < safety_dist || future_dist < dist + 0.1) {
                 // a car in safety range => can't change lane
                 if (car_i_lane == lane - 1) {
                     can_change_left = false;
                 } else {
                     can_change_right = false;
                 }
-            } else {
-                if (car_i[5] > s_current) { // ahead
-                    if (car_i_lane == lane - 1) {
-                        nearest_left_ahead = min(dist, nearest_left_ahead);
-                    } else {
-                        nearest_right_ahead = min(dist, nearest_right_ahead);
-                    }
-                }
-            }
+            } 
         }
 
         // prefer turn left
         if (can_change_left && can_change_right) {
-            return (nearest_left_ahead > nearest_right_ahead)
-                   ? -1
-                   : 1; 
+            return (nearest_left_ahead < nearest_right_ahead)
+                   ? 1
+                   : -1; 
         } else {
             if (can_change_left) {
                 return -1;

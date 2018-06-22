@@ -162,7 +162,7 @@ int main() {
               sensor_fusion,
               50,
               MAX_ACC,
-              15,
+              10,
               30
             );
             

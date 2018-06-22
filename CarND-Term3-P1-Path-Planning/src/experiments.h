@@ -66,6 +66,15 @@ namespace path_planning {
     );
 
     /**
+     * This function return the index of the nearest car ahead 
+     *      i.e in the same lane and ahead of us and closest to us
+     **/
+    int getCarAhead(
+        const Vehicle& car,
+        const std::vector<std::vector<double>>& sensor_fusion
+    );
+
+    /**
      * This generates a keep-lane using Spline
      * We ensure: max-acceleration & max-speed is handled
      *            if there is a car ahead, we should reduce speed to avoid hitting it
@@ -79,6 +88,25 @@ namespace path_planning {
         const std::vector<std::vector<double>>& sensor_fusion,
         size_t nb_points,
         double max_acc 
+    );
+
+    /**
+     * This function will try to change lane if
+     *      there no car in that lane with distance in s within safety distance
+     *      the nearest car behind must have speed <= current speed
+     *      the nearest car ahead must have speed >= current speed
+     **/
+    void getTrajectoryAllowChangeLane(
+              std::vector<double>& next_x_vals,
+              std::vector<double>& next_y_vals,
+              double& ref_v,
+        const HighwayMap& highway_map,
+        const Vehicle& car,
+        const std::vector<std::vector<double>>& sensor_fusion,
+        size_t nb_points,
+        double max_acc,
+        double safety_dist,
+        double look_dist
     );
 }
 

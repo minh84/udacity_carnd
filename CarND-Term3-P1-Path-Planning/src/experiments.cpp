@@ -1,6 +1,7 @@
 #include "experiments.h"
 #include "spline.h"
 #include <math.h>
+#include <iostream>
 
 using namespace std;
 using namespace path_planning;
@@ -90,30 +91,6 @@ namespace {
         ptsy.insert(ptsy.end(), y_vals.begin(), y_vals.end());   
     }
 
-    int getCarAhead(
-        const Vehicle& car,
-        const std::vector<std::vector<double>>& sensor_fusion
-    ) {
-        int i_ahead = -1;
-        double min_s_ahead = 10000;
-        for(size_t i = 0; i < sensor_fusion.size(); ++i) {
-            auto& car_i = sensor_fusion[i]; // id, x, y, vx, vy, s, d
-
-            int car_i_lane = getLane(car_i[6]);
-
-            if (car_i_lane == car.lane()) {
-                double future_s = car.getFuturePosition(car_i);
-
-                if (car.isAhead(future_s) && future_s < min_s_ahead) {
-                    min_s_ahead = future_s;
-                    i_ahead = i;
-                }
-            }
-        }
-
-        return i_ahead;
-    }
-
     void planPointFollowingSpeed(
               std::vector<double>& next_x_vals,
               std::vector<double>& next_y_vals,
@@ -163,6 +140,115 @@ namespace {
             }
         }
         
+    }
+
+    int getLaneOffset(
+        const Vehicle& car,
+        const std::vector<std::vector<double>>& sensor_fusion,
+        double safety_dist,
+        double look_dist 
+    ) {
+        int lane_offset = 0;
+
+        // get lane, current & future position
+        int lane = car.lane();
+        double s_current = car.s();
+        double s_future = car.end_path_s();
+
+        bool can_change_left = (lane > 0);
+        bool can_change_right = (lane < 2);
+
+        double nearest_left_ahead = 10000;
+        double nearest_right_ahead = 10000;
+
+        for (int i = 0; i < sensor_fusion.size(); ++i) {
+            if (!can_change_left && !can_change_left) {
+                return 0;
+            }
+
+            auto& car_i = sensor_fusion[i]; // id, x, y, vx, vy, s, d
+            double dist = abs(car_i[5] - s_current);
+            double future_dist = abs(car.getFuturePosition(car_i) - s_future);
+
+            int car_i_lane = getLane(car_i[6]);
+            if (car_i_lane == -1 
+                || car_i_lane == lane
+                || dist > look_dist) {
+                continue;
+            }
+            
+            if (dist < safety_dist || future_dist < dist) {
+                // a car in safety range => can't change lane
+                if (car_i_lane == lane - 1) {
+                    can_change_left = false;
+                } else {
+                    can_change_right = false;
+                }
+            } else {
+                if (car_i[5] > s_current) { // ahead
+                    if (car_i_lane == lane - 1) {
+                        nearest_left_ahead = min(dist, nearest_left_ahead);
+                    } else {
+                        nearest_right_ahead = min(dist, nearest_right_ahead);
+                    }
+                }
+            }
+        }
+
+        // prefer turn left
+        if (can_change_left && can_change_right) {
+            return (nearest_left_ahead > nearest_right_ahead)
+                   ? -1
+                   : 1; 
+        } else {
+            if (can_change_left) {
+                return -1;
+            }
+            if (can_change_right) {
+                return 1;
+            }
+
+            return 0;
+        }
+    }
+
+    void getTrajectoryGivenLaneAndSpeed(
+              std::vector<double>& next_x_vals,
+              std::vector<double>& next_y_vals,
+              double& ref_v,
+        const HighwayMap& highway_map,
+        const Vehicle& car,
+        const std::vector<std::vector<double>>& sensor_fusion,
+        size_t nb_points,
+        double max_acc,
+        double target_lane,
+        double target_speed
+    ) {
+        // step 1: get Spline
+        double ref_x;
+        double ref_y;
+        double ref_yaw;
+        vector<double> ptsx;
+        vector<double> ptsy;
+
+        getRefPointsForSpline(ref_x, ref_y, ref_yaw, ptsx, ptsy, highway_map, car, target_lane);
+
+        // transform to local coordinate
+        globalToLocal(ptsx, ptsy, ref_x, ref_y, ref_yaw);
+
+        // spline
+        tk::spline s;
+        s.set_points(ptsx, ptsy);
+
+        // plan next point
+        size_t nb_next_point = nb_points - car.prev_size();
+
+        // plan to get to target speed
+        planPointFollowingSpeed(next_x_vals, next_y_vals, ref_v, s, target_speed, nb_next_point, max_acc);
+        localToGlobal(next_x_vals, next_y_vals, ref_x, ref_y, ref_yaw);
+
+        // append previous points
+        car.appendPrevPoints(next_x_vals, next_y_vals);
     }
 }
 
@@ -276,6 +362,30 @@ namespace path_planning {
         car.appendPrevPoints(next_x_vals, next_y_vals);
     }
 
+    int getCarAhead(
+        const Vehicle& car,
+        const std::vector<std::vector<double>>& sensor_fusion
+    ) {
+        int i_ahead = -1;
+        double min_s_ahead = 10000;
+        for(size_t i = 0; i < sensor_fusion.size(); ++i) {
+            auto& car_i = sensor_fusion[i]; // id, x, y, vx, vy, s, d
+
+            int car_i_lane = getLane(car_i[6]);
+
+            if (car_i_lane == car.lane()) {
+                double future_s = car.getFuturePosition(car_i);
+
+                if (car.isAhead(future_s) && future_s < min_s_ahead) {
+                    min_s_ahead = future_s;
+                    i_ahead = i;
+                }
+            }
+        }
+
+        return i_ahead;
+    }
+
     void getTrajectoryKeepLaneNoRed(
               std::vector<double>& next_x_vals,
               std::vector<double>& next_y_vals,
@@ -286,26 +396,7 @@ namespace path_planning {
         size_t nb_points,
         double max_acc 
     ) {
-        int lane = car.lane();
-
-        // step 1: get Spline
-        double ref_x;
-        double ref_y;
-        double ref_yaw;
-        vector<double> ptsx;
-        vector<double> ptsy;
-
-        getRefPointsForSpline(ref_x, ref_y, ref_yaw, ptsx, ptsy, highway_map, car, lane);
-
-        // transform to local coordinate
-        globalToLocal(ptsx, ptsy, ref_x, ref_y, ref_yaw);
-
-        // spline
-        tk::spline s;
-        s.set_points(ptsx, ptsy);
-
-        // plan next point
-        size_t nb_next_point = nb_points - car.prev_size();
+        int target_lane = car.lane();
 
         // get nearest car ahead (-1 means no car ahead)
         int i_ahead = getCarAhead(car, sensor_fusion);
@@ -315,10 +406,63 @@ namespace path_planning {
                              ? MAX_SPEED_MPS
                              : getCarSpeed(sensor_fusion[i_ahead]);
 
-        planPointFollowingSpeed(next_x_vals, next_y_vals, ref_v, s, target_speed, nb_next_point, max_acc);
-        localToGlobal(next_x_vals, next_y_vals, ref_x, ref_y, ref_yaw);
+        getTrajectoryGivenLaneAndSpeed(
+            next_x_vals,
+            next_y_vals,
+            ref_v,
+            highway_map,
+            car,
+            sensor_fusion,
+            nb_points,
+            max_acc,
+            target_lane,
+            target_speed
+        );
+    }
 
-        // append previous points
-        car.appendPrevPoints(next_x_vals, next_y_vals);
+    void getTrajectoryAllowChangeLane(
+              std::vector<double>& next_x_vals,
+              std::vector<double>& next_y_vals,
+              double& ref_v,
+        const HighwayMap& highway_map,
+        const Vehicle& car,
+        const std::vector<std::vector<double>>& sensor_fusion,
+        size_t nb_points,
+        double max_acc,
+        double safety_dist,
+        double look_dist
+    ) {
+        int target_lane = car.lane();
+        double target_speed = ref_v;
+        int lane_offset = 0;
+        // get nearest car ahead (-1 means no car ahead)
+        int i_ahead = getCarAhead(car, sensor_fusion);
+
+        if (i_ahead == -1) {
+            target_speed = MAX_SPEED_MPS;
+        } else {
+            lane_offset = getLaneOffset(car, sensor_fusion, safety_dist, look_dist);
+            if (lane_offset == 0) {
+                // we can't turn left or right we have to slow down and following car ahead
+                target_speed = getCarSpeed(sensor_fusion[i_ahead]);
+            } 
+            target_lane += lane_offset;
+        }
+
+        cout << "i_ahead = " << i_ahead << ", lane_offset = " << lane_offset << "\n";
+
+        // get the trajectory
+        getTrajectoryGivenLaneAndSpeed(
+            next_x_vals,
+            next_y_vals,
+            ref_v,
+            highway_map,
+            car,
+            sensor_fusion,
+            nb_points,
+            max_acc,
+            target_lane,
+            target_speed
+        );
     }
 }

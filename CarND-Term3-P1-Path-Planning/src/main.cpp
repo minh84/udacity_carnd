@@ -142,7 +142,7 @@ int main() {
               target_lane
             );*/
             
-            getTrajectoryKeepLaneNoRed(
+            /*getTrajectoryKeepLaneNoRed(
               next_x_vals,
               next_y_vals,
               ref_v,
@@ -151,6 +151,19 @@ int main() {
               sensor_fusion,
               50,
               MAX_ACC
+            );*/
+
+            getTrajectoryAllowChangeLane(
+              next_x_vals,
+              next_y_vals,
+              ref_v,
+              highway,
+              vehicle,
+              sensor_fusion,
+              50,
+              MAX_ACC,
+              15,
+              30
             );
             
 
@@ -164,7 +177,7 @@ int main() {
             // DEBUG: write to a file
             ++step;
             
-            if (!file_closed) {
+            /*if (!file_closed) {
               logToFile(ofs, step, "x", car_x);
               logToFile(ofs, step, "y", car_y);
               logToFile(ofs, step, "s", car_s);
@@ -179,7 +192,7 @@ int main() {
               logToFile(ofs, step, "next_d_vals", next_d_vals);
               logToFile(ofs, step, "next_x_vals", next_x_vals);
               logToFile(ofs, step, "next_y_vals", next_y_vals);
-            }
+            }*/
 
           	//this_thread::sleep_for(chrono::milliseconds(1000));
           	ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
@@ -207,8 +220,11 @@ int main() {
     }
   });
 
-  h.onConnection([&h](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
+  h.onConnection([&h, &ref_v](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
     std::cout << "Connected!!!" << std::endl;
+
+    // always reset ref_v = 0 to allow re-connected working properly
+    ref_v = 0;
   });
 
   h.onDisconnection([&h, &ofs, &file_closed](uWS::WebSocket<uWS::SERVER> ws, int code,

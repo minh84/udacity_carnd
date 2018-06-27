@@ -71,7 +71,7 @@ namespace path_planning {
 
   bool isChangingToLane(double d, int lane) {
     double lane_center_d = 2.0 + 4.0 * lane;
-    double d_dist = abs(d - lane_center_d)
+    double d_dist = abs(d - lane_center_d);
     return d_dist > 2 && d_dist < 3;
   }
 

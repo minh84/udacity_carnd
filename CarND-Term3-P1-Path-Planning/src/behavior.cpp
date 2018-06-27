@@ -1,6 +1,7 @@
 #include "behavior.h"
 #include "spline.h"
 #include <math.h>
+#include <iostream>
 
 using namespace path_planning;
 using namespace std;
@@ -10,16 +11,20 @@ namespace {
         double _dist_s;
         int _i_nearest;
         
+        double _speed;
+        double _future_dist_s;
+        int    _lane_offset;
 
         CarNearBy(
         )   : _dist_s(10000)
             , _i_nearest(-1)
+            , _speed(MAX_SPEED_MPS)
+            , _future_dist_s(20000)
+            , _lane_offset(0)
         {
         }
 
-        void update(
-            int i, 
-            double dist) 
+        void update(int i, double dist) 
         {
             if (dist < _dist_s) {
                 _dist_s = dist;
@@ -27,204 +32,45 @@ namespace {
             }
         }
 
-        bool isBlock(double safety_dist) const {
-            return (_i_nearest != -1) && (_dist_s < safety_dist);
+        // this should be called only once
+        void finalUpdate(
+            int current_lane,
+            const Vehicle& car, 
+            const std::vector<std::vector<double>>& sensor_fusion) {
+            
+            if (_i_nearest != -1) {
+                auto& nearest_car = sensor_fusion[_i_nearest]; // id, x, y, vx, vy, s, d
+                _speed = getCarSpeed(nearest_car);
+                _future_dist_s = abs(car.getFuturePosition(nearest_car) - car.end_path_s());
+
+                // check if our nearest car is changing to other lane
+                double lane_center_d = 2.0 + 4.0 * current_lane;
+                double d = nearest_car[6];
+                if (current_lane > 0 && d < lane_center_d - CHANGE_LANE_THRESHOLD) {
+                    _lane_offset = -1;
+                } else if (current_lane < 2 && d > lane_center_d + CHANGE_LANE_THRESHOLD) {
+                    _lane_offset = 1;
+                }
+            }
         }
 
-        double futureDist(
-            const Vehicle& car,
-            const std::vector<std::vector<double>>& sensor_fusion) const {
-            return (_i_nearest==-1) 
-                    ? 20000
-                    : abs(car.getFuturePosition(sensor_fusion[_i_nearest]) - car.end_path_s());
+        // get speed ahead
+        double limitSpeed(double current_speed) const {
+            return min(_speed, current_speed);
         }
 
-        bool isImproveDist(
-            const Vehicle& car,
-            const std::vector<std::vector<double>>& sensor_fusion,
-            double dist_improve) const {
-            return futureDist(car, sensor_fusion) > _dist_s + dist_improve;
+        int laneOffset() const {
+            return _lane_offset;
         }
 
-        double getSpeedNearestCar(const std::vector<std::vector<double>>& sensor_fusion) {
-            return (_i_nearest==-1) 
-                    ? MAX_SPEED_MPS
-                    : getCarSpeed(sensor_fusion[_i_nearest]);
+        bool isNotImproveDist() const {
+            return _future_dist_s < _dist_s + IMPROVE_DIST_THRESHOLD;
         }
 
-        bool nearestCarIsChangingToLane(
-            int lane,
-            const std::vector<std::vector<double>>& sensor_fusion) const {
-            return (_i_nearest == -1)
-                    ? true
-                    : isChangingToLane(sensor_fusion[_i_nearest][6], lane);
-
+        bool isWithin(double dist) const {
+            return _dist_s < dist;
         }
     };
-
-    bool canChangeToLane(
-        const CarNearBy& carAhead,
-        const CarNearBy& carBehind,
-        const Vehicle& car,
-        const std::vector<std::vector<double>>& sensor_fusion
-    ) {
-        if (carAhead._lane == -1) {
-            return false;
-        }
-
-        if (carAhead.isBlock(SAFETY_DIST_CHANGE_LANE_AHEAD) 
-            || carBehind.isBlock(SAFETY_DIST_CHANGE_LANE_BEHIND)) {
-            return false;
-        }
-
-        if (!carAhead.isImproveDist(car, sensor_fusion, DIST_IMPROVE)
-            || !carBehind.isImproveDist(car, sensor_fusion, DIST_IMPROVE)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    double getAheadSpeed(
-        int target_lane,
-        const Vehicle& car,
-        const std::vector<std::vector<double>>& sensor_fusion
-    ) {
-        CarNearBy car_ahead(car.s(), target_lane, true);
-
-        for(int i = 0; i < sensor_fusion.size(); ++i) {
-            double s_i = sensor_fusion[i][5];
-            int lane_i = getLane(sensor_fusion[i][6]);
-            car_ahead.update(i, lane_i, s_i);
-        }
-
-        if (car_ahead.isBlock(SAFETY_DIST)) {
-            return car_ahead.getSpeedNearestCar(sensor_fusion);
-        } else {
-            return MAX_SPEED_MPS;
-        }
-    }
-
-    int getLaneOffset(
-        int current_lane,
-        const CarNearBy& l_ahead,
-        const CarNearBy& r_ahead,
-        const CarNearBy& l_behind,
-        const CarNearBy& r_behind,
-        const Vehicle& car,
-        const std::vector<std::vector<double>>& sensor_fusion
-    ) {
-        bool can_change_left = (current_lane > 0) && canChangeToLane(l_ahead, l_behind, car, sensor_fusion);
-        bool can_change_right = (current_lane < 2) && canChangeToLane(r_ahead, r_behind, car, sensor_fusion);
-
-        if (can_change_left && can_change_right) {
-            if (r_ahead.futureDist(car, sensor_fusion) > l_ahead.futureDist(car, sensor_fusion)) {
-                return 1;
-            } else {
-                return -1;
-            }
-        } else {
-            if (can_change_left) {
-                return -1;
-            }
-
-            if (can_change_right) {
-                return 1;
-            }
-
-            return 0;
-        }
-    }
-
-    bool canChangeToLane(
-        const CarNearBy& carAhead,
-        const CarNearBy& carAheadInLane,
-        const CarNearBy& carBehindInLane,
-        const Vehicle& car,
-        const std::vector<std::vector<double>>& sensor_fusion
-    ) {
-        if (carAhead.isBlock(SAFETY_DIST_CHANGE_LANE_AHEAD) 
-            || carBehind.isBlock(SAFETY_DIST_CHANGE_LANE_BEHIND)) {
-            return false;
-        }
-
-        if (!carAhead.isImproveDist(car, sensor_fusion, DIST_IMPROVE)
-            || !carBehind.isImproveDist(car, sensor_fusion, DIST_IMPROVE)) {
-            return false;
-        }
-
-        if (carAheadInLane.getSpeedNearestCar(sensor_fusion) < carAhead.getSpeedNearestCar(sensor_fusion)) {
-            return false;
-        } 
-
-        return true;
-    }
-
-    bool canChangeToLane(
-        int target_lane,
-        const vector<CarNearBy>& cars_ahead,
-        const Vehicle& car,
-        const std::vector<std::vector<double>>& sensor_fusion
-    ) {
-        return false;
-    }
-
-    void getLaneAndSpeed(
-        int& target_lane,
-        double& target_speed,
-        const vector<CarNearBy>& cars_ahead,
-        const vector<CarNearBy>& cars_behind,
-        const Vehicle& car,
-        const std::vector<std::vector<double>>& sensor_fusion
-    ) {
-        // check if we get blocked
-        //      => try to change lane
-        //      => otherwise keep lane and reduce speed
-        // we assume that car in other lane might change to our lane in no car ahead block us
-        int current_lane = car.lane();
-        target_lane = current_lane;
-        bool is_blocked_ahead = cars_ahead[current_lane].isBlock(SAFETY_DIST);
-
-        bool can_change_left = (current_lane > 0 
-                                && canChangeToLane(current_lane - 1, cars_ahead, car, sensor_fusion));
-        bool can_change_right = (current_lane < 2 
-                                && canChangeToLane(current_lane + 1, cars_ahead, car, sensor_fusion));
-        bool is_blocked_left  = false;
-        bool is_blocked_right = false;
-        if (!is_blocked_ahead) {
-            is_blocked_left |= (current_lane > 0 
-                                && cars_ahead[current_lane - 1].isBlock(SAFETY_DIST)
-                                && cars_ahead[current_lane - 1].nearestCarIsChangingToLane(current_lane));
-            
-            is_blocked_right |= (current_lane < 2
-                                && cars_ahead[current_lane + 1].isBlock(SAFETY_DIST)
-                                && cars_ahead[current_lane + 1].nearestCarIsChangingToLane(current_lane));
-
-            if (is_blocked_left) {
-                // try to change to right lane
-                if (current_lane < 2 
-                    && canChangeToLane(current_lane + 1, cars_ahead, car, sensor_fusion)) {
-                    target_lane = current_lane + 1;
-                    target_speed = cars_ahead[target_lane].getSpeedNearestCar(sensor_fusion);
-                } else {
-                    target_speed = cars_ahead[current_lane - 1].getSpeedNearestCar(sensor_fusion);
-                }
-            } else if (is_blocked_right) {
-                // try to change to left lane
-                if  {
-                    target_lane = current_lane - 1;
-                    target_speed = cars_ahead[target_lane].getSpeedNearestCar(sensor_fusion);
-                } else {
-                    target_speed = cars_ahead[current_lane + 1].getSpeedNearestCar(sensor_fusion);
-                }
-            } else {
-                // no block keep the max speed
-                target_speed = MAX_SPEED_MPS;
-            }
-        } else { // already block
-
-        }
-    }
 
     void getRefPointsForSpline(
               double& ref_x,
@@ -271,6 +117,7 @@ namespace {
         double x = 0.;
         double max_speed_diff = max_acc * TIME_STEP;
 
+        // while speed not close enough to target-speed => we adjust the speed
         while ((diff > max_speed_diff) && (i < nb_points)) {
             if (ref_v < target_speed) {
                 ref_v += max_speed_diff;
@@ -287,6 +134,7 @@ namespace {
             ++i;
         }
         
+        // when it's close enough we set it to target-speed
         if (i < nb_points) {
             ref_v = target_speed;
             double x_step = local_target_x * ref_v * TIME_STEP / target_dist;
@@ -338,6 +186,85 @@ namespace {
         car.appendPrevPoints(next_x_vals, next_y_vals);
     }
 
+    // limit speed by car ahead
+    void limitSpeed(
+              vector<double>& speed,
+        const vector<CarNearBy>& carsAhead
+    ) {
+        for(int i = 0; i < NB_LANES; ++i) {
+            auto& carAhead = carsAhead[i];
+            speed[i] = carAhead.limitSpeed(speed[i]);
+
+            // if car ahead is changing into other lane then it will 
+            // cause a speed limit in the other lane too
+            if (carAhead.laneOffset()) {
+                int i_next = i + carAhead.laneOffset(); 
+                speed[i_next] = carAhead.limitSpeed(speed[i_next]);
+            }
+        }
+    }
+
+    // check if we should change to lane
+    bool canChangeTo(
+        int target_lane,
+        const vector<CarNearBy>& carsAhead,
+        const vector<CarNearBy>& carsBehind
+    ) {
+        auto& carAhead = carsAhead[target_lane];
+        auto& carBehind = carsBehind[target_lane];
+
+        if (carAhead.isWithin(SAFETY_DIST_CHANGE_LANE_AHEAD)
+            || carBehind.isWithin(SAFETY_DIST_CHANGE_LANE_BEHIND)) 
+        {
+            return false;
+        }
+
+        if (carAhead.isNotImproveDist() || carBehind.isNotImproveDist()) 
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    int computeLaneOffset(
+        const Vehicle& car,
+        const int current_lane,
+        const vector<double>& speed,
+        const vector<CarNearBy>& carsAhead,
+        const vector<CarNearBy>& carsBehind
+    ) {
+        int lane_offset = 0;
+        // check if we are not in changing-lane mode
+        if (isInCenterOfLane(car.d(), current_lane) 
+                && speed[current_lane] < MAX_SPEED_MPS) {
+            bool could_change_left = (current_lane > 0) 
+                                        && (speed[current_lane - 1] > speed[current_lane])
+                                        && canChangeTo(current_lane - 1, carsAhead, carsBehind);
+            bool could_change_right = (current_lane < 2)
+                                        && (speed[current_lane + 1] > speed[current_lane])
+                                        && canChangeTo(current_lane + 1, carsAhead, carsBehind);
+
+            if (could_change_left && could_change_right) {
+                lane_offset = (speed[current_lane + 1] > speed[current_lane - 1])
+                                ? 1
+                                : -1;
+            } else {
+                if (could_change_left) {
+                    lane_offset = -1;
+                }
+
+                if (could_change_right) {
+                    lane_offset = 1;
+                }
+            }
+
+            /*cout << "current_lane =" << current_lane 
+                 << ", could_change_left =" << could_change_left  
+                 << ", could_change_right =" << could_change_right << "\n";*/
+        }
+        return lane_offset;
+    }
 }
 
 namespace path_planning {
@@ -368,34 +295,41 @@ namespace path_planning {
         // keep cache of current step
         ++_step;  
 
-        double target_speed = _ref_v;
-        
-        // check if any car is changing lane mode: we keep _taget_lane and compute the _target_speed
-        if (!isInCenterOfLane(car.d(), _target_lane)) {
-            target_speed = getAheadSpeed(_target_lane, car, sensor_fusion);
-        } else {
-            // otherwise check surrounding cars
-            vector<CarNearBy> carsAhead(3);
-            vector<CarNearBy> carsBehind(3);
-            double s_behind = car.s() - _look_behind_dist;
-            double s_ahead = car.s() + _look_ahead_dist;
+        // get the list of surrounding car (where s-car.s() in the range [-look_behind_dist, lock_ahead_dist])
+        vector<CarNearBy> carsAhead(NB_LANES);
+        vector<CarNearBy> carsBehind(NB_LANES);
+        double s_behind = car.s() - _look_behind_dist;
+        double s_ahead = car.s() + _look_ahead_dist;
 
-            for(int i = 0; i < sensor_fusion.size(); ++i) {
-                double s_i = sensor_fusion[i][5];
-                int lane_i = getLane(sensor_fusion[i][6]);
-                if (lane_i == -1
-                    || s_i < s_behind
-                    || s_i > s_ahead) {
-                    continue;
-                }
+        for(int i = 0; i < sensor_fusion.size(); ++i) {
+            double s_i = sensor_fusion[i][5];
+            int lane_i = getLane(sensor_fusion[i][6]);
 
-                if (s_i < car.s()) {
-                    carsBehind[lane_i].update(i, car.s() - s_i);
-                } else {
-                    carsAhead[lane_i].update(i, s_i - car.s());
-                }
+            // check if car in the interested range
+            if (s_i < s_behind || s_i > s_ahead || lane_i == -1) {
+                continue;
+            }
+
+            if (s_i < car.s()) {
+                carsBehind[lane_i].update(i, car.s() - s_i);
+            } else {
+                carsAhead[lane_i].update(i, s_i - car.s());
             }
         }
+
+        // update speed & future dist
+        for (int i = 0; i < NB_LANES; ++i) {
+            carsBehind[i].finalUpdate(i, car, sensor_fusion);
+            carsAhead[i].finalUpdate(i, car, sensor_fusion);
+        }
+
+        // evaluate speed in each lane
+        std::vector<double> speed(NB_LANES, MAX_SPEED_MPS);
+        limitSpeed(speed, carsAhead);
+
+        int lane_offset = computeLaneOffset(car, _target_lane, speed, carsAhead, carsBehind);  
+        _target_lane += lane_offset;
+
 
         getTrajectoryGivenLaneAndSpeed(
             next_x_vals,
@@ -406,7 +340,7 @@ namespace path_planning {
             NB_POINTS,
             MAX_ACC,
             _target_lane,
-            target_speed
+            speed[_target_lane]
         );
     }
 }

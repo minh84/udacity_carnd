@@ -9,6 +9,9 @@
 namespace path_planning {
   // Define const
 
+  // number of lane
+  static const size_t NB_LANES = 3;
+
   // number of point
   static const size_t NB_POINTS = 50;
 
@@ -29,14 +32,15 @@ namespace path_planning {
   // safety distance 30m
   static const double SAFETY_DIST = 25; 
   static const double SAFETY_DIST_CHANGE_LANE_AHEAD = 25;
-  static const double SAFETY_DIST_CHANGE_LANE_BEHIND = 15;
+  static const double SAFETY_DIST_CHANGE_LANE_BEHIND = 10;
   
 
   // change lane if improve
-  static const double DIST_IMPROVE = .1;
+  static const double IMPROVE_DIST_THRESHOLD = .1;
 
   // consider in the center of the lane
   static const double CENTER_THRESHOLD = 0.5;
+  static const double CHANGE_LANE_THRESHOLD = 1.0;
 
   // Store highways map to make it easier to pass as an argument
   // we don't 

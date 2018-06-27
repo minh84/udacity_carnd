@@ -177,7 +177,7 @@ namespace path_planning {
     double current_dist = abs(car_in_other_lane[5] - s());
     double future_dist  = abs(getFuturePosition(car_in_other_lane) - end_path_s());
 
-    if (future_dist < current_dist + DIST_IMPROVE) {
+    if (future_dist < current_dist + IMPROVE_DIST_THRESHOLD) {
       return true;
     }
 

@@ -27,7 +27,16 @@ namespace path_planning {
   static const double MAX_DIST_DIFF = MAX_SPEED_DIFF * TIME_STEP;
 
   // safety distance 30m
-  static const double SAFETY_DIST = 30; 
+  static const double SAFETY_DIST = 25; 
+  static const double SAFETY_DIST_CHANGE_LANE_AHEAD = 25;
+  static const double SAFETY_DIST_CHANGE_LANE_BEHIND = 15;
+  
+
+  // change lane if improve
+  static const double DIST_IMPROVE = .1;
+
+  // consider in the center of the lane
+  static const double CENTER_THRESHOLD = 0.5;
 
   // Store highways map to make it easier to pass as an argument
   // we don't 
@@ -57,6 +66,9 @@ namespace path_planning {
   double distance(double x1, double y1, double x2, double y2);
 
   int getLane(double d);
+  bool isInCenterOfLane(double d, int lane);
+  bool isChangingToLane(double d, int lane);
+
   double getCarSpeed(const std::vector<double>& car_sensor);
 
   int ClosestWaypoint(

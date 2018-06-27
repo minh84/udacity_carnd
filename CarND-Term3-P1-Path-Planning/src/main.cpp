@@ -58,15 +58,10 @@ int main() {
 	}
 	
 	HighwayMap highway(map_waypoints_x, map_waypoints_y, map_waypoints_s, map_waypoints_dx, map_waypoints_dy);
-
-  // DEBUG file
-  int step = 0;
-  ofstream ofs ("drive-log-now.csv", std::ofstream::out);
-  bool file_closed = false;
-  double ref_v = 0.;
+  Behavior behavior(highway, 60, 30);
 
   h.onMessage(
-    [&highway, &ref_v, &step, &ofs, &file_closed](
+    [&behavior](
       uWS::WebSocket<uWS::SERVER> ws, 
       char *data, 
       size_t length, 
@@ -124,75 +119,23 @@ int main() {
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
 
-            // first generate next points in Frenet 
             vector<double> next_x_vals;
             vector<double> next_y_vals;
-            vector<double> next_s_vals;
-            vector<double> next_d_vals;
 
-            double target_dist = 0.3;
-            int target_lane = 1;
-            /*getTrajectoryKeepLaneSplineConstSpeed(
+            // plan next trajectory
+            behavior.generateTrajectory(
               next_x_vals,
               next_y_vals,
-              highway,
               vehicle,
-              50,
-              target_dist,
-              target_lane
-            );*/
-            
-            /*getTrajectoryKeepLaneNoRed(
-              next_x_vals,
-              next_y_vals,
-              ref_v,
-              highway,
-              vehicle,
-              sensor_fusion,
-              50,
-              MAX_ACC
-            );*/
-
-            getTrajectoryAllowChangeLane(
-              next_x_vals,
-              next_y_vals,
-              ref_v,
-              highway,
-              vehicle,
-              sensor_fusion,
-              50,
-              MAX_ACC,
-              10,
-              30
+              sensor_fusion
             );
             
-
 						// DONE
             json msgJson;
           	msgJson["next_x"] = next_x_vals;
           	msgJson["next_y"] = next_y_vals;
 
           	auto msg = "42[\"control\","+ msgJson.dump()+"]";
-
-            // DEBUG: write to a file
-            ++step;
-            
-            /*if (!file_closed) {
-              logToFile(ofs, step, "x", car_x);
-              logToFile(ofs, step, "y", car_y);
-              logToFile(ofs, step, "s", car_s);
-              logToFile(ofs, step, "d", car_d);
-              logToFile(ofs, step, "yaw", car_yaw);
-              logToFile(ofs, step, "speed", car_speed);
-              logToFile(ofs, step, "end_path_s", end_path_s);
-              logToFile(ofs, step, "end_path_d", end_path_d);
-              logToFile(ofs, step, "previous_path_x", previous_path_x);
-              logToFile(ofs, step, "previous_path_y", previous_path_y);
-              logToFile(ofs, step, "next_s_vals", next_s_vals);
-              logToFile(ofs, step, "next_d_vals", next_d_vals);
-              logToFile(ofs, step, "next_x_vals", next_x_vals);
-              logToFile(ofs, step, "next_y_vals", next_y_vals);
-            }*/
 
           	//this_thread::sleep_for(chrono::milliseconds(1000));
           	ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
@@ -220,19 +163,17 @@ int main() {
     }
   });
 
-  h.onConnection([&h, &ref_v](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
+  h.onConnection([&h, &behavior](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
     std::cout << "Connected!!!" << std::endl;
 
-    // always reset ref_v = 0 to allow re-connected working properly
-    ref_v = 0;
+    // always reset behavior to allow re-connected working properly
+    behavior.reset();
   });
 
-  h.onDisconnection([&h, &ofs, &file_closed](uWS::WebSocket<uWS::SERVER> ws, int code,
+  h.onDisconnection([&h](uWS::WebSocket<uWS::SERVER> ws, int code,
                          char *message, size_t length) {
     //ws.close();
     std::cout << "Disconnected" << std::endl;
-    ofs.close();
-    file_closed = true;
   });
 
   int port = 4567;
@@ -243,7 +184,4 @@ int main() {
     return -1;
   }
   h.run();
-  if (!file_closed) {
-    ofs.close();
-  }
 }

@@ -105,8 +105,19 @@ namespace path_planning {
         const std::vector<std::vector<double>>& sensor_fusion,
         size_t nb_points,
         double max_acc,
-        double safety_dist,
         double look_dist
+    );
+
+    void getTrajectoryGivenLaneAndSpeed(
+              std::vector<double>& next_x_vals,
+              std::vector<double>& next_y_vals,
+              double& ref_v,
+        const HighwayMap& highway_map,
+        const Vehicle& car,
+        size_t nb_points,
+        double max_acc,
+        double target_lane,
+        double target_speed
     );
 }
 

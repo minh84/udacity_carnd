@@ -161,6 +161,29 @@ namespace path_planning {
     return (future_s > own_future_s && future_s < own_future_s + SAFETY_DIST);
   }
 
+  bool Vehicle::isNotSafeToChangeLane(double s) const {
+    return (s > _s - SAFETY_DIST_CHANGE_LANE_BEHIND && s < _s + SAFETY_DIST_CHANGE_LANE_AHEAD);
+  }
+
+  bool Vehicle::isNotBetterToChangeLane(
+    const std::vector<double>& car_in_same_lane,
+    const std::vector<double>& car_in_other_lane) const {
+    
+    if (car_in_other_lane[5] > s() 
+          && getCarSpeed(car_in_other_lane) < getCarSpeed(car_in_same_lane)) {
+      return true;
+    }
+    
+    double current_dist = abs(car_in_other_lane[5] - s());
+    double future_dist  = abs(getFuturePosition(car_in_other_lane) - end_path_s());
+
+    if (future_dist < current_dist + DIST_IMPROVE) {
+      return true;
+    }
+
+    return false;
+  }
+
   bool Vehicle::isNotSafe(double future_s) const {
     double own_future_s = end_path_s();
     double dist = abs(future_s - own_future_s);

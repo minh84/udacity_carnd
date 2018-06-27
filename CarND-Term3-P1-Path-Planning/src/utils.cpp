@@ -64,6 +64,17 @@ namespace path_planning {
     }
   }
 
+  bool isInCenterOfLane(double d, int lane) {
+    double lane_center_d = 2.0 + 4.0 * lane;
+    return abs(d - lane_center_d) < CENTER_THRESHOLD;
+  }
+
+  bool isChangingToLane(double d, int lane) {
+    double lane_center_d = 2.0 + 4.0 * lane;
+    double d_dist = abs(d - lane_center_d)
+    return d_dist > 2 && d_dist < 3;
+  }
+
   double getCarSpeed(const std::vector<double>& car_sensor) {
     double vx = car_sensor[3];
     double vy = car_sensor[4];

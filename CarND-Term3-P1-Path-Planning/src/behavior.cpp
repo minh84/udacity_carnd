@@ -56,7 +56,13 @@ namespace {
 
         // get speed ahead
         double limitSpeed(double current_speed) const {
-            return min(_speed, current_speed);
+            if (_future_dist_s < SAFETY_DIST) {
+                return max(MAX_SPEED_DIFF, min(_speed - MAX_SPEED_DIFF, current_speed));
+            } else if (_future_dist_s < SLOW_DOWN_DIST) {
+                return min(_speed, current_speed);
+            } else {
+                return current_speed;
+            }
         }
 
         int laneOffset() const {
@@ -329,7 +335,6 @@ namespace path_planning {
 
         int lane_offset = computeLaneOffset(car, _target_lane, speed, carsAhead, carsBehind);  
         _target_lane += lane_offset;
-
 
         getTrajectoryGivenLaneAndSpeed(
             next_x_vals,

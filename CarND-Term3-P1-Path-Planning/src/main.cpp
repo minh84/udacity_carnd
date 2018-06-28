@@ -58,7 +58,7 @@ int main() {
 	}
 	
 	HighwayMap highway(map_waypoints_x, map_waypoints_y, map_waypoints_s, map_waypoints_dx, map_waypoints_dy);
-  Behavior behavior(highway, 45, 25);
+  Behavior behavior(highway, 40, 20);
 
   h.onMessage(
     [&behavior](

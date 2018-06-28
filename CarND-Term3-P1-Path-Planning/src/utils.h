@@ -16,7 +16,7 @@ namespace path_planning {
   static const size_t NB_POINTS = 50;
 
   // max speed is 50 MPH, then we convert to MPS
-  static const double MAX_SPEED_MPH = 49.5;
+  static const double MAX_SPEED_MPH = 49.8;
   static const double MPH_TO_MPS = 0.44704;
   static const double MAX_SPEED_MPS = MAX_SPEED_MPH * MPH_TO_MPS;
 
@@ -29,11 +29,12 @@ namespace path_planning {
   static const double MAX_SPEED_DIFF = MAX_ACC * TIME_STEP;
   static const double MAX_DIST_DIFF = MAX_SPEED_DIFF * TIME_STEP;
 
-  // safety distance 30m
+  // safety distance
   static const double SAFETY_DIST = 25; 
   static const double SAFETY_DIST_CHANGE_LANE_AHEAD = 25;
   static const double SAFETY_DIST_CHANGE_LANE_BEHIND = 10;
   
+  static const double SLOW_DOWN_DIST = 30;
 
   // change lane if improve
   static const double IMPROVE_DIST_THRESHOLD = .1;

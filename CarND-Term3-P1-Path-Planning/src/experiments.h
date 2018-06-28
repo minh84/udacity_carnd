@@ -6,6 +6,20 @@
 #include "vehicle.h"
 
 namespace path_planning {
+    void logToFile(
+        std::ofstream& outfile,
+        int step,
+        const std::string& tag,
+        double value
+    );
+
+    void logToFile(
+        std::ofstream& outfile,
+        int step,
+        const std::string& tag,
+        const std::vector<double>& values
+    );
+
     /**
      * This generates a straight line trajectory 
      **/

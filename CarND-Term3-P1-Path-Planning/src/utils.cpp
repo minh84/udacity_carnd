@@ -287,30 +287,5 @@ namespace path_planning {
     }
   }
 
-  void logToFile(
-    std::ofstream& outfile,
-    int step,
-    const std::string& tag,
-    double value)
-  {
-    outfile << step << ";" << tag << ";" 
-            << std::fixed << std::setprecision(3) << value << "\n"; 
-  }
-
-  void logToFile(
-    std::ofstream& outfile,
-    int step,
-    const std::string& tag,
-    const std::vector<double>& values)
-  {
-    outfile << step << ";" << tag << ";[";
-    outfile << std::fixed << std::setprecision(3);
-    if (!values.empty()) {
-      outfile << values[0];
-      for (int i = 1; i < values.size(); ++i) {
-        outfile << "," << values[i];
-      }
-    }
-    outfile << "]\n";
-  }
+  
 }

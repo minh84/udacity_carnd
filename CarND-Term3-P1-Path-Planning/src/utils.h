@@ -131,17 +131,7 @@ namespace path_planning {
       double ref_yaw
   );
 
-  void logToFile(
-    std::ofstream& outfile,
-    int step,
-    const std::string& tag,
-    double value);
-
-  void logToFile(
-    std::ofstream& outfile,
-    int step,
-    const std::string& tag,
-    const std::vector<double>& values);
+  
 }
 
 #endif

@@ -83,8 +83,6 @@ namespace {
 }
 
 namespace path_planning {
-
-
     void getTrajectoryGivenLaneAndSpeed(
               std::vector<double>& next_x_vals,
               std::vector<double>& next_y_vals,

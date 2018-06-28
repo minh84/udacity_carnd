@@ -89,20 +89,6 @@ namespace path_planning {
     double getFuturePosition(
       const std::vector<double>& car_sensor
     ) const;
-
-    // check in Frenet is a given s is ahead of end_path_s() and distance to end_path_s() < SAFETY_DIST
-    bool isAhead(double s) const;
-
-    // check if it's within non-safe to change lane
-    bool isNotSafeToChangeLane(double s) const;
-
-    // check if change lane is not better
-    bool isNotBetterToChangeLane(
-      const std::vector<double>& car_in_same_lane,
-      const std::vector<double>& car_in_other_lane) const;
-
-    // check in Frenet if a given s is within SAFETY_DIST with the end_path_s()
-    bool isNotSafe(double s) const;
   };
 }
 

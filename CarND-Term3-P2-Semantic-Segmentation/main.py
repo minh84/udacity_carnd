@@ -34,7 +34,7 @@ def load_vgg(sess, vgg_path):
     vgg_layer7_out_tensor_name = 'layer7_out:0'
 
     # load saved model
-    tf.save_model.loader.load(sess, [vgg_tag], vgg_path)
+    tf.saved_model.loader.load(sess, [vgg_tag], vgg_path)
     graph = tf.get_default_graph()
 
     vgg_input = graph.get_tensor_by_name(vgg_input_tensor_name)
@@ -57,7 +57,69 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :return: The Tensor for the last layer of output
     """
     # TODO: Implement function
-    return None
+
+    # constant
+    l2_reg = 1e-3
+
+    # conv 1x1
+    layer7_conv_1x1 = tf.layers.conv2d(vgg_layer7_out,
+                                       num_classes,
+                                       1,
+                                       strides=(1, 1),
+                                       padding='same',
+                                       kernel_regularizer=tf.contrib.layers.l2_regularizer(l2_reg),
+                                       name='layer7_conv_1x1')
+
+    layer7_up_2x = tf.layers.conv2d_transpose(layer7_conv_1x1,
+                                                 num_classes,
+                                                 4,
+                                                 strides=(2, 2),
+                                                 padding='same',
+                                                 kernel_regularizer=tf.contrib.layers.l2_regularizer(l2_reg),
+                                                 name='layer7_up_2x')
+
+    layer4_conv_1x1 = tf.layers.conv2d(vgg_layer4_out,
+                                       num_classes,
+                                       1,
+                                       strides=(1, 1),
+                                       padding='same',
+                                       kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+                                       name='layer4_conv_1x1')
+
+    # skip connection layer4 + 2x-layer7
+    layer4_skip_conn = tf.add(layer4_conv_1x1, layer7_up_2x, name='layer4_skip_conn')
+
+    # upsample again
+    layer4_skip_conn_2x = tf.layers.conv2d_transpose(layer4_skip_conn,
+                                                     num_classes,
+                                                     4,
+                                                     strides=(2, 2),
+                                                     padding='same',
+                                                     kernel_regularizer=tf.contrib.layers.l2_regularizer(l2_reg),
+                                                     name='layer4_skip_conn_2x')
+
+
+    layer3_conv_1x1 = tf.layers.conv2d(vgg_layer3_out,
+                                       num_classes,
+                                       1,
+                                       strides=(1, 1),
+                                       padding='same',
+                                       kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+
+    # skip connection layer3 + 2x-layer 4 + 4x-layer7
+    layer3_skip_conn = tf.add(layer3_conv_1x1, layer4_skip_conn_2x, name='layer3_skip_conn')
+
+    # up sample to match the original
+    output = tf.layers.conv2d_transpose(layer3_skip_conn,
+                                        num_classes,
+                                        16,
+                                        strides=(8, 8),
+                                        padding='same',
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(l2_reg),
+                                        name='output')
+
+
+    return output
 tests.test_layers(layers)
 
 

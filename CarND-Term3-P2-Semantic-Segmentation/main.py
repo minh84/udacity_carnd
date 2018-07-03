@@ -4,6 +4,7 @@ import helper
 import warnings
 from distutils.version import LooseVersion
 import project_tests as tests
+import sys
 
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion(
@@ -48,7 +49,6 @@ def load_vgg(sess, vgg_path):
 
 tests.test_load_vgg(load_vgg, tf)
 
-
 def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     """
     Create the layers for a fully convolutional network.  Build skip-layers using the vgg layers.
@@ -60,16 +60,20 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     """
     # TODO: Implement function
 
-    # constant
+    # weight initializer & regularizer
+    weight_init_stddev = 1e-2
+    kernel_init = tf.random_normal_initializer(stddev=weight_init_stddev)
+
     l2_reg = 1e-3
+    kernel_reg = tf.contrib.layers.l2_regularizer(l2_reg)
 
     # conv 1x1
     layer7_conv_1x1 = tf.layers.conv2d(vgg_layer7_out,
                                        num_classes,
                                        1,
-                                       strides=(1, 1),
                                        padding='same',
-                                       kernel_regularizer=tf.contrib.layers.l2_regularizer(l2_reg),
+                                       kernel_initializer=kernel_init,
+                                       kernel_regularizer=kernel_reg,
                                        name='layer7_conv_1x1')
 
     layer7_up_2x = tf.layers.conv2d_transpose(layer7_conv_1x1,
@@ -77,19 +81,20 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
                                               4,
                                               strides=(2, 2),
                                               padding='same',
-                                              kernel_regularizer=tf.contrib.layers.l2_regularizer(l2_reg),
+                                              kernel_initializer=kernel_init,
+                                              kernel_regularizer=kernel_reg,
                                               name='layer7_up_2x')
 
     layer4_conv_1x1 = tf.layers.conv2d(vgg_layer4_out,
                                        num_classes,
                                        1,
-                                       strides=(1, 1),
                                        padding='same',
-                                       kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+                                       kernel_initializer=kernel_init,
+                                       kernel_regularizer=kernel_reg,
                                        name='layer4_conv_1x1')
 
     # skip connection layer4 + 2x-layer7
-    layer4_skip_conn = tf.add(layer4_conv_1x1, layer7_up_2x, name='layer4_skip_conn')
+    layer4_skip_conn = tf.add(layer7_up_2x, layer4_conv_1x1, name='layer4_skip_conn')
 
     # upsample again
     layer4_skip_conn_2x = tf.layers.conv2d_transpose(layer4_skip_conn,
@@ -97,18 +102,19 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
                                                      4,
                                                      strides=(2, 2),
                                                      padding='same',
-                                                     kernel_regularizer=tf.contrib.layers.l2_regularizer(l2_reg),
+                                                     kernel_initializer=kernel_init,
+                                                     kernel_regularizer=kernel_reg,
                                                      name='layer4_skip_conn_2x')
 
     layer3_conv_1x1 = tf.layers.conv2d(vgg_layer3_out,
                                        num_classes,
                                        1,
-                                       strides=(1, 1),
                                        padding='same',
-                                       kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+                                       kernel_initializer=kernel_init,
+                                       kernel_regularizer=kernel_reg)
 
     # skip connection layer3 + 2x-layer 4 + 4x-layer7
-    layer3_skip_conn = tf.add(layer3_conv_1x1, layer4_skip_conn_2x, name='layer3_skip_conn')
+    layer3_skip_conn = tf.add(layer4_skip_conn_2x, layer3_conv_1x1, name='layer3_skip_conn')
 
     # up sample to match the original
     output = tf.layers.conv2d_transpose(layer3_skip_conn,
@@ -116,7 +122,8 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
                                         16,
                                         strides=(8, 8),
                                         padding='same',
-                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(l2_reg),
+                                        kernel_initializer=kernel_init,
+                                        kernel_regularizer=kernel_reg,
                                         name='output')
 
     return output
@@ -177,14 +184,22 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     sess.run(tf.global_variables_initializer())
 
     for epoch in range(epochs):
+        step = 1
         for image, label in get_batches_fn(batch_size):
-            _, loss = sess.run([train_op],
+            _, loss = sess.run([train_op, cross_entropy_loss],
                                feed_dict= {
                                    input_image: image,
                                    correct_label: label,
                                    keep_prob : 0.5,
-                                   learning_rate: 1e-4
+                                   learning_rate: 1e-5
                                })
+            #
+            sys.stdout.write("\rEpoch ({:>4d}/{:4d}) ".format(epoch + 1, epochs)
+                             + "Step {:>5d} Loss {:.4f} ".format(step, loss))
+            step += 1
+
+        print("")
+
 
 
 tests.test_train_nn(train_nn)
@@ -225,8 +240,8 @@ def run():
         logits, train_op, cross_entropy_loss = optimize(nn_last_layer, correct_label, learning_rate, num_classes)
 
         # TODO: Train NN using the train_nn function
-        epochs = 1
-        batch_size = 16
+        epochs = 12
+        batch_size = 5
 
         train_nn(sess, epochs, batch_size, get_batches_fn,
                  train_op, cross_entropy_loss, vgg_input,

@@ -148,9 +148,10 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
 
     # as in the lecture, we don't need to reshape the output
     cross_entropy_loss = tf.reduce_mean(
-        tf.nn.softmax_cross_entropy_with_logits(logits=logits,
-                                                labels=correct_label
-                                                )
+        tf.nn.softmax_cross_entropy_with_logits(
+            logits=logits,
+            labels=correct_label
+        )
     )
 
     # define optimizer & train-op

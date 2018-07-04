@@ -13,9 +13,9 @@ Most of the code is already provided in `helper.py`, we only need to implement t
 
 * `layers`: is used to create **skip-connection** layers as described in the lecture. Here we use [`conv 1x1`](https://www.tensorflow.org/api_docs/python/tf/layers/conv2d) (to preserve spatial information) to  and [`conv2d_transpose`](https://www.tensorflow.org/api_docs/python/tf/layers/conv2d_transpose) to upsample a layer to a higher resolution or dimension.
 
-* `optimize`: is used to create loss function and training operator.
+* `optimize`: is used to create loss function (`tf.nn.softmax_cross_entropy_with_logits`) and training operator (`tf.train.AdamOptimizer`).
 
-* `train_nn`: is where the training implemented
+* `train_nn`: is where the training implemented.
 
 * `run`: is used to create FCN layers, run the training and apply trained models on test images.
 

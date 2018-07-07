@@ -183,9 +183,10 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
 
     # init variables
     sess.run(tf.global_variables_initializer())
-
+    epochs_losses = []
     for epoch in range(epochs):
         step = 1
+        losses = []
         for image, label in get_batches_fn(batch_size):
             _, loss = sess.run([train_op, cross_entropy_loss],
                                feed_dict= {
@@ -198,9 +199,12 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
             sys.stdout.write("\rEpoch ({:>4d}/{:4d}) ".format(epoch + 1, epochs)
                              + "Step {:>5d} Loss {:.4f} ".format(step, loss))
             step += 1
+            losses.append(loss)
 
         print("")
+        epochs_losses.append(losses)
 
+    return epochs_losses
 
 
 tests.test_train_nn(train_nn)

@@ -5,7 +5,7 @@ import warnings
 from distutils.version import LooseVersion
 import project_tests as tests
 import sys
-
+import pickle
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion(
     '1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
@@ -210,7 +210,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
 tests.test_train_nn(train_nn)
 
 
-def run():
+def run(epochs, batch_size):
     num_classes = 2
     image_shape = (160, 576)
     data_dir = './data'
@@ -245,19 +245,25 @@ def run():
         logits, train_op, cross_entropy_loss = optimize(nn_last_layer, correct_label, learning_rate, num_classes)
 
         # TODO: Train NN using the train_nn function
-        epochs = 12
-        batch_size = 5
-
-        train_nn(sess, epochs, batch_size, get_batches_fn,
-                 train_op, cross_entropy_loss, vgg_input,
-                 correct_label, vgg_keep_prob, learning_rate)
+        epochs_losses = train_nn(sess, epochs, batch_size, get_batches_fn,
+                                 train_op, cross_entropy_loss, vgg_input,
+                                 correct_label, vgg_keep_prob, learning_rate)
 
         # TODO: Save inference data using helper.save_inference_samples
         helper.save_inference_samples(runs_dir, data_dir, sess,
                                       image_shape, logits, vgg_keep_prob, vgg_input)
 
         # OPTIONAL: Apply the trained model to a video
+    return epochs_losses
 
 
 if __name__ == '__main__':
-    run()
+    epochs = 32
+    batch_size = 5
+    epochs_losses = run(epochs, batch_size)
+
+    # dump loss for visualization
+    losses_file = 'epochs_losses_{}.pkl'.format(epochs)
+    with open(losses_file, 'wb') as f:
+        pickle.dump(epochs_losses, f)
+        print('Loss at each epoch is dumped to {}'.format(losses_file))
